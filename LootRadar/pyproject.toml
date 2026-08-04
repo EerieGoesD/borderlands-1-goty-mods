@@ -1,0 +1,16 @@
+[project]
+name = "Loot Radar"
+version = "1.0.0"
+authors = [{ name = "eeriegoesd" }]
+description = """Marks loot lying around on your compass, so you never walk off leaving something behind.
+
+For full information about this mod and how this works, please visit: eeriegoesd.com"""
+
+[tool.sdkmod]
+name = "Loot Radar"
+mod_type = "Standard"
+supported_games = ["BL1"]
+coop_support = "Unknown"
+auto_enable = "True"
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/LootRadar/LootRadar.sdkmod"
+license = {name = "All rights reserved" }

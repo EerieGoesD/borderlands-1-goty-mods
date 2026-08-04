@@ -29,3 +29,7 @@ Needs the [BL1 PythonSDK](https://github.com/bl-sdk/willow1-mod-manager).
 ## Contact
 
 Questions or feedback: eeriegoesd@gmail.com or eeriegoesd.com
+
+## Support
+
+If you'd like to support my mods, feel free to [buy me a coffee](https://buymeacoffee.com/eeriegoesd).

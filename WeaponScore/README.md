@@ -3,7 +3,7 @@
 Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it.
 
 The number shows on item cards in your backpack, in vending machines, on mission rewards
-and on loot lying on the ground. Page Up and Page Down in the backpack reach a DPS page,
+and on loot lying on the ground. Page Up and Page Down in the backpack shows a DPS page,
 listing everything you carry best first.
 
 Weapons: `shots x damage x pellets / (shots x fire interval + reload)`, where shots is

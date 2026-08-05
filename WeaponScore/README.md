@@ -6,14 +6,10 @@ The number shows on item cards in your backpack, in vending machines, on mission
 and on loot lying on the ground. Page Up and Page Down in the backpack reach a DPS page,
 listing everything you carry best first.
 
-## How the numbers are worked out
-
-- Expected DPS, on weapons: shots x damage x pellets, divided by (shots x fire interval
-  plus reload), where shots is the magazine divided by the ammo each shot costs
-- Shield Power, on shields: capacity + recharge rate x (60 - recharge delay)
-
-Every number is read from the item itself, unrounded, so it can differ slightly from the
-card.
+Weapons: `shots x damage x pellets / (shots x fire interval + reload)`, where shots is
+the magazine divided by the ammo each shot costs. Shields:
+`capacity + recharge rate x (60 - recharge delay)`. Every number comes off the item
+itself, unrounded, so it can differ slightly from the card.
 
 ## Settings
 

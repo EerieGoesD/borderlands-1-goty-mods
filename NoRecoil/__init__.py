@@ -8,13 +8,7 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption
 
-StopSpread = BoolOption(
-    "Also Stop Spread",
-    False,
-    "Yes",
-    "No",
-    description="Every shot lands dead centre instead of scattering around the crosshair.",
-)
+StopSpread = BoolOption("Also Stop Spread", False, "Yes", "No")
 
 
 # A scope's own drifting sits on the gun's kind rather than on the gun, so the

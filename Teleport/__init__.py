@@ -112,9 +112,22 @@ def shut_the_menu() -> None:
         pass
 
 
-def on_travel(_option) -> None:
+def on_travel(option) -> None:
     """Takes you to the chosen place, once the menu is out of the way."""
     global waiting
+
+    # Nothing of ours runs while the mod is off, so the trip would never happen.
+    if not this_mod.is_enabled:
+        try:
+            from ui_utils import TrainingBox  # noqa: PLC0415
+
+            TrainingBox(
+                title="Teleport",
+                message="This mod is turned off.\n\nSet Enabled to Yes, then press Go There.",
+            ).show()
+        except Exception as ex:
+            logging.warning(f"[Teleport] the mod is turned off ({ex})")
+        return
 
     where = places.get(Pick.value)
     if where is None:
@@ -175,7 +188,7 @@ def on_enable() -> None:
 __version__: str
 __version_info__: tuple[int, ...]
 
-build_mod(
+this_mod = build_mod(
     options=[Pick, Travel, Refresh],
     keybinds=[],
     hooks=[on_render],

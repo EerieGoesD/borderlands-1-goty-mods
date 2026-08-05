@@ -1,6 +1,6 @@
 # Run And Walk
 
-You walk by default. Hold Shift to run, or press Caps Lock to switch for good.
+Makes running and walking work off a hold key and a toggle key.
 
 ## Settings
 

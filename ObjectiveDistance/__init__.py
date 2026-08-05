@@ -965,7 +965,7 @@ def on_render(
         try:
             draw_route(canvas, pc.Pawn.Location)
         except Exception as ex:
-            logging.info(f"[Objective Distance] could not draw route ({ex})")
+            logging.dev_warning(f"[Objective Distance] could not draw route ({ex})")
 
     if ShowDistance.value is False or not cached_text:
         return

@@ -1,6 +1,6 @@
 # Gear Score
 
-Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it.
+Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it (character skills not counted).
 
 The number shows on item cards in your backpack, in vending machines, on mission rewards
 and on loot lying on the ground. Page Up and Page Down in the backpack shows a DPS page,

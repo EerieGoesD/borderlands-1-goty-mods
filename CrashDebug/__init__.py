@@ -1,4 +1,5 @@
 import os
+import time
 import traceback
 from pathlib import Path
 
@@ -124,8 +125,11 @@ def note(text: str) -> None:
     if log_file is None:
         return
 
-    line = f"{written:08d}  {text}"[: SLOT_SIZE - 1]
-    line = line + "\n" + " " * (SLOT_SIZE - len(line) - 1)
+    clock = time.strftime("%H:%M:%S")
+    line = f"{written:08d}  {clock}  {text}"[: SLOT_SIZE - 1]
+    # The spare room sits before the line break, so no blank stretch is left in front
+    # of the next one.
+    line = line + " " * (SLOT_SIZE - len(line) - 1) + "\n"
     where = (written % int(KeepSlots.value)) * SLOT_SIZE
 
     try:

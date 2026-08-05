@@ -6,21 +6,11 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
+from mods_base import SETTINGS_DIR, Game, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption
 
 FLASH_CARD = "topLevel_mc.card"
 PICKUP_CARD = "inventory.card1"
-
-# The mission reward screen, which does not use the same name as the others.
-REWARD_CARDS = (
-    "topLevel_mc.card1",
-    "topLevel_mc.card",
-    "rewards.card1",
-    "rewardsPage.card1",
-    "card1",
-    "card",
-)
 
 LABEL = "Expected DPS"
 SHIELD_LABEL = "Shield Power"
@@ -539,6 +529,9 @@ def on_card_hover(
     update_cards(obj)
 
 
+# Enhanced fills its cards at a moment the original does not, and without these two
+# the reading never appears there. In the original the card is not ready this early,
+# and writing then would wipe the bonus lines, so they are only used on Enhanced.
 @hook(
     hook_func="WillowGame.StatusMenuExGFxMovie:UpdateCardPanel",
     hook_type=Type.POST,
@@ -551,6 +544,23 @@ def on_card_panel(
 ) -> None:
     """The card being filled in, whichever way you got there."""
     update_cards(obj)
+
+
+@hook(
+    hook_func="WillowGame.VendingMachineGFxMovie:UpdateCardPanel",
+    hook_type=Type.POST,
+)
+def on_vendor_panel(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The shop's card being filled in, whichever way you got there."""
+    update_cards(obj)
+
+
+ENHANCED_ONLY = (on_card_panel, on_vendor_panel)
 
 
 @hook(
@@ -600,7 +610,6 @@ def on_pickup_card(
     apply_item(obj, PICKUP_CARD, ground_item)
 
 
-reward_item: UObject | None = None
 
 # Temporary: times how long a full magazine takes when you fire it as fast as you can.
 MEASURE_FIRE = False
@@ -814,138 +823,6 @@ def on_pool_tick(
     pool_time = now
 
 
-WATCH_REWARDS = False
-
-
-
-
-STAT_TAIL = ".funstats.htmlText"
-
-# True while our own line is being written, so the write below is left alone.
-writing = False
-
-
-@hook(hook_func="GFxUI.GFxMovie:SetVariableString", hook_type=Type.POST)
-def on_set_string(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    """The mission reward card fills itself in after the screen says it is ready."""
-    global writing
-
-    if writing or reward_item is None:
-        return
-
-    try:
-        path = str(__args.Path)
-    except Exception:
-        return
-
-    if not path.endswith(STAT_TAIL):
-        return
-
-    writing = True
-    try:
-        apply_item(obj, path[: -len(STAT_TAIL)], reward_item)
-    except Exception as ex:
-        logging.dev_warning(f"[{LABEL}] could not score the reward ({ex})")
-    finally:
-        writing = False
-
-
-@hook(hook_func="WillowGame.QuestAcceptGFxMovie:OnClose", hook_type=Type.POST_UNCONDITIONAL)
-def on_reward_closed(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    global reward_item
-    reward_item = None
-
-
-def card_paths(hints: list[str]) -> list[str]:
-    """Every place the reward card might live, hints from the game first."""
-    paths = list(hints)
-    paths += list(REWARD_CARDS)
-
-    for holder in ("", "topLevel_mc.", "rewards.", "rewardsPage.", "quest.", "main."):
-        for name in ("card", "card1", "itemcard", "rewardcard", "rewardCard"):
-            paths.append(f"{holder}{name}")
-
-    seen: list[str] = []
-    for path in paths:
-        if path and path not in seen:
-            seen.append(path)
-    return seen
-
-
-def find_card(movie: UObject, hints: list[str] | None = None) -> str | None:
-    """The mission screen names its card differently, so look for the one with text."""
-    for path in card_paths(hints or []):
-        if get_string(movie, f"{path}.funstats.htmlText"):
-            return path
-        if get_string(movie, f"{path}.itemname.text"):
-            return path
-    return None
-
-
-@hook(
-    hook_func="WillowGame.QuestAcceptGFxMovie:SetUpRewardsPageItem",
-    hook_type=Type.POST,
-)
-def on_reward_item(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    global reward_item
-    reward_item = __args.Inv
-    if WATCH_REWARDS:
-        logging.info(f"[{LABEL}] reward item {reward_item}")
-
-
-@hook(
-    hook_func="WillowGame.QuestAcceptGFxMovie:SetRewardCard",
-    hook_type=Type.POST,
-)
-def on_reward_card(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    patch_shield_delay()
-
-    # The game may hand the card's own path in, which beats guessing.
-    hints: list[str] = []
-    try:
-        for name in dir(__args):
-            if name.startswith("_"):
-                continue
-            value = getattr(__args, name)
-            if isinstance(value, str) and value:
-                hints.append(value)
-        if WATCH_REWARDS:
-            logging.info(f"[{LABEL}] SetRewardCard args {hints}")
-    except Exception as ex:
-        if WATCH_REWARDS:
-            logging.info(f"[{LABEL}] no args ({ex})")
-
-    card = find_card(obj, hints)
-    if WATCH_REWARDS:
-        logging.info(f"[{LABEL}] card {card} item {reward_item}")
-
-    # The card usually fills itself in later, and that write is caught elsewhere.
-    if card is None:
-        return
-
-    apply_item(obj, card, reward_item)
-
-
 @hook(
     hook_func="WillowGame.VendingMachineGFxMovie:UpdateCardPanelWithItemOfTheDay",
     hook_type=Type.POST,
@@ -983,20 +860,6 @@ def on_vendor_hover(
     __func: BoundFunction,
 ) -> None:
     """The mouse resting on a row in the shop."""
-    update_cards(obj)
-
-
-@hook(
-    hook_func="WillowGame.VendingMachineGFxMovie:UpdateCardPanel",
-    hook_type=Type.POST,
-)
-def on_vendor_panel(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    """The shop's card being filled in, whichever way you got there."""
     update_cards(obj)
 
 
@@ -1042,27 +905,22 @@ build_mod(
     ],
     keybinds=[],
     hooks=[
-        on_set_string,
-        on_reward_closed,
         on_card_key,
         on_card_mouse,
         on_card_hover,
-        on_card_panel,
         on_compare_start,
         on_compare,
         on_vendor_daily,
         on_vendor_item,
         on_vendor_hover,
-        on_vendor_panel,
         on_vendor_compare_start,
         on_vendor_compare,
         on_pickup_card,
-        on_reward_item,
-        on_reward_card,
         on_fire,
         on_pool_tick,
         on_sorting,
         on_sorted,
+        *(ENHANCED_ONLY if Game.get_current() is Game.BL1E else ()),
     ],
     commands=[],
     settings_file=Path(f"{SETTINGS_DIR}/WeaponScore.json"),

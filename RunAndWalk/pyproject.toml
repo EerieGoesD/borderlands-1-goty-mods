@@ -2,7 +2,7 @@
 name = "Run And Walk"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """You walk by default. Hold Shift to run, or press Caps Lock to switch for good.
+description = """Makes running and walking work off a hold key and a toggle key.
 
 For full information about this mod and how this works, please visit: eeriegoesd.com"""
 

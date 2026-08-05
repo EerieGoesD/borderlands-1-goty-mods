@@ -1,6 +1,7 @@
 # Mission Progress
 
 Shows your overall mission progress and total game completion and where you are in the story, top-right.
+Aligned with the Borderlands mission flow.
 
 ## What each line means
 
@@ -14,7 +15,7 @@ Shows your overall mission progress and total game completion and where you are 
 - **Enable DLC Missions**: 216 missions instead of 126.
 - **Flag Skipped Missions**: The red list on or off.
 - **Achievement Warnings**: A red note when a known bug in the current mission can cost you an achievement.
-- **Upcoming missions shown**: How many missions to list ahead. 0 shows none.
+- **Upcoming missions shown**: How many missions to list ahead.
 
 ## Install
 

@@ -9,7 +9,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Gear Score](WeaponScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
-| [Mission Progress](MissionProgress) | Mission progress and where you are in the story |
+| [Mission Progress](MissionProgress) | Mission progress (total game progression %) tracker |
 | [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
 | [No Backpack Limit](NoBackpackLimit) | Lets you carry as much as you like |
 | [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |

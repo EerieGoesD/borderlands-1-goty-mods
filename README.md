@@ -1,6 +1,7 @@
 # Borderlands 1 GOTY mods
 
-Mods for Borderlands 1 GOTY Enhanced, built on the [BL1 PythonSDK](https://github.com/bl-sdk/willow1-mod-manager).
+Mods for Borderlands 1 GOTY on Steam, built on the [BL1 PythonSDK](https://github.com/bl-sdk/willow1-mod-manager).
+Tested on GOTY only, not on GOTY Enhanced.
 
 | Mod | What it does |
 | --- | --- |

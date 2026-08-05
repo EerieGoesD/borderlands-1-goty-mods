@@ -102,8 +102,33 @@ def read_number(weapon: UObject, name: str, fallback: float) -> float:
     return float(value)
 
 
+def card_dps(weapon: UObject) -> float | None:
+    """The very number Gear Score prints on the card, when that mod is there to work it out.
+
+    Its reading counts elemental damage and whatever else its own settings say, so
+    without it the beam would rank guns by a different number than the card shows.
+    Accuracy is the one thing it cannot do here, since that only exists on a card and
+    loot on the ground has none.
+    """
+    try:
+        import WeaponScore  # type: ignore
+    except Exception:
+        return None
+
+    try:
+        if WeaponScore.DisregardAccuracy.value is not True:
+            return None
+        return WeaponScore.get_dps(None, "", weapon)
+    except Exception:
+        return None
+
+
 def gun_dps(weapon: UObject) -> float | None:
     """Damage a second over a full magazine, including the reload that follows it."""
+    matching = card_dps(weapon)
+    if matching is not None:
+        return matching
+
     try:
         damage = read_number(weapon, "InstantHitDamage", 0)
         fire_interval = read_number(weapon, "FireInterval", 0)

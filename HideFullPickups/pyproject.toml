@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Stops ammo you cannot carry from lighting up on the ground.
 
-For full information about this mod and how this works, please visit: eeriegoesd.com"""
+For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 
 [tool.sdkmod]
 name = "Hide Full Pickups"

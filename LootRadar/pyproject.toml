@@ -2,9 +2,9 @@
 name = "Loot Radar"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Marks loot lying around on your compass, so you never walk off leaving something behind.
+description = """Marks loot and unopened chests on your compass, so you never walk off leaving something behind.
 
-For full information about this mod and how this works, please visit: eeriegoesd.com"""
+For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 
 [tool.sdkmod]
 name = "Loot Radar"

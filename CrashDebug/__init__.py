@@ -249,14 +249,6 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    description=(
-        "Keeps a running note of what every mod was doing, so a crash leaves a record of"
-        f" the last thing that ran. The note is called {LOG_STEM} and its settings choose"
-        " whether it goes to your Desktop, your Documents or the mods folder, and whether"
-        " it is a .log or a .txt.\n\n"
-        "For full information about this mod and how this works, please visit:"
-        " eeriegoesd.com"
-    ),
     options=[SaveTo, FileEnding, WhereIsIt, WrapMods, KeepSlots],
     keybinds=[],
     hooks=[on_render],

@@ -1,6 +1,7 @@
 # Loot Radar
 
-Marks loot lying around on your compass, so you never walk off leaving something behind.
+Marks loot and unopened chests on your compass, so you never walk off leaving something
+behind.
 
 Only what you can actually pick up is marked, so ammo you have no room for is left out.
 The distance to each mark is written above it.

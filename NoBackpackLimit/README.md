@@ -1,6 +1,6 @@
 # No Backpack Limit
 
-Lets you carry as much as you like, whatever your backpack holds.
+Sets how many things your backpack holds.
 
 ## Settings
 

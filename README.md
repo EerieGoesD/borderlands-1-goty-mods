@@ -13,11 +13,11 @@ Tested on both GOTY and GOTY Enhanced.
 | [Infinite Health](InfiniteHealth) | God-mode basically |
 | [Jump Higher](JumpHigher) | Lets you jump higher than the game allows |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
-| [Mission Progress](MissionProgress) | Mission progress (total game progression %) tracker |
+| [Mission Progress](MissionProgress) | Shows your mission progress and total game completion |
 | [Movement Speed Changer](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
-| [No Backpack Limit](NoBackpackLimit) | Lets you carry as much as you like |
+| [No Backpack Limit](NoBackpackLimit) | Sets how many things your backpack holds |
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
-| [No Reload](NoReload) | Your magazine never runs down, so there is nothing to reload |
+| [No Reload](NoReload) | Your magazine never runs down |
 | [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |
 | [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |

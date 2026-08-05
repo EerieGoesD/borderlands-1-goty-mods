@@ -2,7 +2,7 @@
 name = "Vehicle Loot"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Picks loot up for you while you are driving.
+description = """Picks loot up while you are driving.
 
 For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 

@@ -1,0 +1,17 @@
+[project]
+name = "Sell Value"
+version = "1.0.0"
+authors = [{ name = "eeriegoesd" }]
+description = """Shows what an item sells for on its card.
+
+For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
+
+[tool.sdkmod]
+name = "Sell Value"
+mod_type = "Standard"
+supported_games = ["BL1", "BL1E"]
+coop_support = "Unknown"
+auto_enable = "True"
+
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/SellValue/SellValue.sdkmod"
+license = {name = "All rights reserved" }

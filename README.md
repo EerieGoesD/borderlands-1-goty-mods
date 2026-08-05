@@ -13,7 +13,7 @@ Tested on GOTY only, not on GOTY Enhanced.
 | [Use No Reload](UseNoReload) | Stops the Use key reloading your gun |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Run And Walk](RunAndWalk) | Hold Shift to run, Caps Lock to run for good |
-| [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim and crouch |
+| [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
 
 ## Install
 

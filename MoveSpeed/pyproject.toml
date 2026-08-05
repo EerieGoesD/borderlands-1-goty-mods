@@ -2,7 +2,7 @@
 name = "Move Speed"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Sets how fast you walk, run and move while aiming.
+description = """Sets how fast you walk, run, aim, crouch and drive.
 
 For full information about this mod and how this works, please visit: eeriegoesd.com"""
 

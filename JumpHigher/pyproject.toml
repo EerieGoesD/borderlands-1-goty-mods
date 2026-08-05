@@ -1,0 +1,17 @@
+[project]
+name = "Jump Higher"
+version = "1.0.0"
+authors = [{ name = "eeriegoesd" }]
+description = """Lets you jump higher than the game allows.
+
+For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
+
+[tool.sdkmod]
+name = "Jump Higher"
+mod_type = "Standard"
+supported_games = ["BL1", "BL1E"]
+coop_support = "Unknown"
+auto_enable = "True"
+
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/JumpHigher/JumpHigher.sdkmod"
+license = {name = "All rights reserved" }

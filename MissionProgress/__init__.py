@@ -53,9 +53,8 @@ WARNING_TEXT = "Careful! Possible missable/glitched achievement"
 # How often the panel and the mission lookup refresh, in frames.
 REFRESH_FRAMES = 300
 
-# How often we check whether a shop screen is up, in frames. Looking for one means
-# going through everything the game holds, which is the dearest thing here.
-SHOP_FRAMES = 90
+# How often we check whether a shop screen is up, in frames.
+SHOP_FRAMES = 10
 
 Position = SpinnerOption(
     "Position",
@@ -237,21 +236,22 @@ def on_render(
         if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
             return
 
-        # A shop screen counts too. Hunting for one every frame is far too slow, so
-        # it is asked now and then and only the yes or no is kept.
+        # A shop screen counts too. Asking the game which screen it is playing every
+        # frame is too slow, so it is asked now and then and only the answer is kept.
         shop_frames += 1
         if shop_frames >= SHOP_FRAMES:
             shop_frames = 0
             shop_open = False
-            for shop in unrealsdk.find_all("VendingMachineGFxMovie"):
+            for manager in unrealsdk.find_all("WillowGFxUIManager"):
                 try:
-                    if "Default__" in str(shop.Name):
-                        continue
-                    if shop.bMovieIsOpen is True:
-                        shop_open = True
-                        break
+                    playing = manager.GetPlayingMovie()
                 except Exception:
                     continue
+                if playing is None:
+                    continue
+                if "VendingMachine" in str(playing.Class.Name):
+                    shop_open = True
+                    break
 
         if shop_open:
             return

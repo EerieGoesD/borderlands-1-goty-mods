@@ -21,6 +21,8 @@ Tested on both GOTY and GOTY Enhanced.
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
 | [Reset Chests](ResetChests) | Shuts every red and white chest you have opened in this area |
 | [Run And Walk](RunAndWalk) | Makes running and walking work off a hold key and a toggle key |
+| [Sell Value](SellValue) | Shows what an item sells for on its card |
+| [Teleport](Teleport) | Takes you to any place you have already been to in this playthrough |
 | [Use No Reload](UseNoReload) | Stops the Use key reloading your gun |
 | [Vehicle Loot](VehicleLoot) | Picks loot up while you drive |
 

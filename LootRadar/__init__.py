@@ -19,6 +19,9 @@ TEXT_SCALE = 0.6
 # Frames between sweeps of the area.
 REFRESH_FRAMES = 30
 
+# How often we check whether a shop screen is up, in frames.
+SHOP_FRAMES = 10
+
 # The compass bar, measured as a share of the screen.
 # Enhanced draws its bar lower down than the original does.
 COMPASS_CENTRE = 0.5
@@ -53,6 +56,11 @@ ShowDistance = BoolOption("Show Distance", True, "Yes", "No")
 Units = SpinnerOption("Units", value="Metres", choices=["Metres", "Feet"], wrap_enabled=True)
 
 frames = REFRESH_FRAMES
+
+# Whether a shop screen is up, asked now and then rather than every frame.
+shop_open = False
+shop_frames = SHOP_FRAMES
+
 marks: list[tuple[tuple[float, float, float], bool]] = []
 hidden: set[UObject] = set()
 
@@ -588,7 +596,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, gear, black
+    global frames, gear, black, shop_open, shop_frames
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or pc.myHUD is None:
@@ -609,6 +617,26 @@ def on_render(
     # Nothing of ours draws while the menu with the map and skills is up.
     try:
         if pc.bStatusMenuOpen is True:
+            return
+
+        # A shop screen counts too. Asking the game which screen it is playing every
+        # frame is too slow, so it is asked now and then and only the answer is kept.
+        shop_frames += 1
+        if shop_frames >= SHOP_FRAMES:
+            shop_frames = 0
+            shop_open = False
+            for manager in unrealsdk.find_all("WillowGFxUIManager"):
+                try:
+                    playing = manager.GetPlayingMovie()
+                except Exception:
+                    continue
+                if playing is None:
+                    continue
+                if "VendingMachine" in str(playing.Class.Name):
+                    shop_open = True
+                    break
+
+        if shop_open:
             return
     except Exception:
         pass

@@ -9,7 +9,7 @@ For full information about this mod and how this works, please visit: eeriegoesd
 [tool.sdkmod]
 name = "Gear Score"
 mod_type = "Standard"
-supported_games = ["BL1"]
+supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = "True"
 download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/WeaponScore/WeaponScore.sdkmod"

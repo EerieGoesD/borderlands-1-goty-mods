@@ -21,18 +21,12 @@ The distance to each mark is written above it.
 - **Show Red Chests**: Red chests nobody has opened yet.
 - **Show White Chests**: White chests nobody has opened yet.
 - **Display Only Better Weapons**: Hides weapons that are worse than the worst one of that
-  type you already carry. You cannot pick them up either.
+  type you already carry, and stops you picking them up. Score is shots x damage x pellets,
+  divided by (shots x fire interval plus reload), where shots is the magazine divided by
+  the ammo each shot costs.
 - **Hide Full Pickups**: Ammo you cannot carry stops lighting up.
 - **Show Distance**: How far away each mark is, written above it.
 - **Units**: Metres or feet.
-
-## How a weapon is scored
-
-Shots x damage x pellets, divided by (shots x fire interval plus reload), where shots is
-the magazine divided by the ammo each shot costs.
-
-Weapons are only compared against their own type: shotguns against shotguns, snipers
-against snipers, and so on.
 
 ## Install
 

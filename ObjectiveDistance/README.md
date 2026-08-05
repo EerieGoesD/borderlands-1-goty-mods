@@ -2,8 +2,13 @@
 
 Shows how far your objective is, plus a line on the ground showing the way.
 
-The line follows the paths the game's own characters walk, and points at the same place
-your compass waypoint does, including when the waypoint sits in another area.
+## What it draws
+
+- A distance reading, under the compass or at the top of the screen
+- A line on the ground to your objective
+
+The line follows the paths the game's own characters walk, and points where your compass
+waypoint points, including when that sits in another area.
 
 ## Settings
 

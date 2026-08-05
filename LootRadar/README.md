@@ -3,9 +3,15 @@
 Marks loot lying around on your compass, so you never walk off leaving something behind.
 
 Only what you can actually pick up is marked, so ammo you have no room for is left out.
+The distance to each mark is written above it.
 
-Green marks are weapons and items, yellow is money, blue is ammo and health, red and white
-are unopened chests. The distance to each one is written above its mark.
+## Mark colours
+
+- Green: weapons and items
+- Yellow: money
+- Blue: ammo and health
+- Red: an unopened red chest
+- White: an unopened white chest
 
 ## Settings
 

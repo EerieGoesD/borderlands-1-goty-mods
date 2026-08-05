@@ -2,9 +2,12 @@
 
 Shows your overall mission progress and total game completion and where you are in the story, top-right.
 
-Blue is how much of the game you have finished. Yellow is the mission you are tracking
-in the log. Red lists missions the story offered before that one and you never finished.
-Grey lists what comes next.
+## What each line means
+
+- Blue: how much of the game you have finished
+- Yellow: the mission you are tracking in the log
+- Red: missions the story offered before that one, still unfinished
+- Grey: what comes next
 
 ## Settings
 

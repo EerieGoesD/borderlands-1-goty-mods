@@ -2,8 +2,8 @@
 
 Stops ammo you cannot carry from lighting up on the ground.
 
-Anything that would say FULL loses its beam and its icon. The moment you spend some
-ammo and can pick it up again, the beam comes back.
+Anything that would say FULL loses its beam and its icon. Spend some ammo and the beam
+comes back.
 
 ## Install
 

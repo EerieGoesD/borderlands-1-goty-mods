@@ -2,8 +2,8 @@
 
 Stops the "E" (Use) key from reloading your gun.
 
-In the stock game, pressing Use with nothing in front of you reloads. This mod leaves
-reloading to the reload key alone.
+In the stock game, pressing Use with nothing in front of you reloads. Reloading is left
+to the reload key alone.
 
 ## Install
 

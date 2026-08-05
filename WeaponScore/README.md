@@ -2,18 +2,15 @@
 
 Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it.
 
-The number shows on cards in your backpack, in vending machines, on mission rewards and
-on loot lying on the ground.
+The number shows on item cards in your backpack, in vending machines, on mission rewards
+and on loot lying on the ground. Page Up and Page Down in the backpack reach a DPS page,
+listing everything you carry best first.
 
-Expected DPS, on weapons:
-shots x damage x pellets, divided by (shots x fire interval + reload), where shots is the
-magazine divided by the ammo each shot costs.
+## How the numbers are worked out
 
-Shield Power, on shields:
-capacity + recharge rate x (60 - recharge delay).
-
-Page Up and Page Down in the backpack reach a DPS page, which lists everything you carry
-best first.
+- Expected DPS, on weapons: shots x damage x pellets, divided by (shots x fire interval
+  plus reload), where shots is the magazine divided by the ammo each shot costs
+- Shield Power, on shields: capacity + recharge rate x (60 - recharge delay)
 
 Every number is read from the item itself, unrounded, so it can differ slightly from the
 card.

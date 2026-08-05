@@ -35,7 +35,7 @@ NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 DisregardAccuracy = BoolOption("Disregard Accuracy", True, "Yes", "No")
 DisregardCritical = BoolOption("Disregard Critical", True, "Yes", "No")
-DisregardElements = BoolOption("Disregard Elements", True, "Yes", "No")
+DisregardElements = BoolOption("Disregard Elements", False, "Yes", "No")
 FontSize = SliderOption("Score font size", 9, 0, 24, 1, True)
 
 CRIT_ATTRIBUTE = "PlayerCriticalHitBonus"
@@ -526,6 +526,34 @@ def on_card_mouse(
 
 
 @hook(
+    hook_func="WillowGame.StatusMenuExGFxMovie:extSetMouseOverCell",
+    hook_type=Type.POST,
+)
+def on_card_hover(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """Resting the mouse on a row is the only thing that happens when hovering."""
+    update_cards(obj)
+
+
+@hook(
+    hook_func="WillowGame.StatusMenuExGFxMovie:UpdateCardPanel",
+    hook_type=Type.POST,
+)
+def on_card_panel(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The card being filled in, whichever way you got there."""
+    update_cards(obj)
+
+
+@hook(
     hook_func="WillowGame.StatusMenuExGFxMovie:extCompare",
     hook_type=Type.PRE,
 )
@@ -945,6 +973,34 @@ def on_vendor_item(
 
 
 @hook(
+    hook_func="WillowGame.VendingMachineGFxMovie:extSetMouseOverCell",
+    hook_type=Type.POST,
+)
+def on_vendor_hover(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The mouse resting on a row in the shop."""
+    update_cards(obj)
+
+
+@hook(
+    hook_func="WillowGame.VendingMachineGFxMovie:UpdateCardPanel",
+    hook_type=Type.POST,
+)
+def on_vendor_panel(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The shop's card being filled in, whichever way you got there."""
+    update_cards(obj)
+
+
+@hook(
     hook_func="WillowGame.VendingMachineGFxMovie:extCompare",
     hook_type=Type.PRE,
 )
@@ -990,10 +1046,14 @@ build_mod(
         on_reward_closed,
         on_card_key,
         on_card_mouse,
+        on_card_hover,
+        on_card_panel,
         on_compare_start,
         on_compare,
         on_vendor_daily,
         on_vendor_item,
+        on_vendor_hover,
+        on_vendor_panel,
         on_vendor_compare_start,
         on_vendor_compare,
         on_pickup_card,

@@ -1,0 +1,16 @@
+[project]
+name = "Crash Debug"
+version = "1.0.0"
+authors = [{ name = "eeriegoesd" }]
+description = """Keeps a running note of what every mod was doing, so a crash leaves a record of the last thing that ran. The note is called CrashDebug and its settings choose whether it goes to your Desktop, your Documents or the mods folder, and whether it is a .log or a .txt.
+
+For full information about this mod and how this works, please visit: eeriegoesd.com"""
+
+[tool.sdkmod]
+name = "Crash Debug"
+mod_type = "Standard"
+supported_games = ["BL1", "BL1E"]
+coop_support = "Unknown"
+auto_enable = "True"
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/CrashDebug/CrashDebug.sdkmod"
+license = {name = "All rights reserved" }

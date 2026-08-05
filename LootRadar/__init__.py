@@ -6,7 +6,7 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Block, Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
+from mods_base import SETTINGS_DIR, Game, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
 FONT = "ui_fonts.font_willowbody_18pt"
@@ -20,9 +20,10 @@ TEXT_SCALE = 0.6
 REFRESH_FRAMES = 30
 
 # The compass bar, measured as a share of the screen.
+# Enhanced draws its bar lower down than the original does.
 COMPASS_CENTRE = 0.5
 COMPASS_HALF_WIDTH = 0.143
-COMPASS_TOP = 0.833
+COMPASS_TOP = 0.885 if Game.get_current() is Game.BL1E else 0.833
 COMPASS_ARC = 45.0
 
 # How far above the bar the marks sit, and how big they are.
@@ -345,6 +346,11 @@ chest_frames = CHESTS_EVERY
 # What each pickup turned out to be, so its name is only read once.
 kinds: dict[UObject, str] = {}
 
+# How many sweeps to sit out while a new area is being swapped in.
+SETTLE_SWEEPS = 4
+settling = 0
+last_area = ""
+
 
 def find_chests() -> list[tuple[tuple[float, float, float], str]]:
     """Chests in the area that nobody has opened yet."""
@@ -391,13 +397,36 @@ def sweep() -> None:
 
     The same pass also keeps ammo you cannot carry from lighting up.
     """
-    global marks
-
-    marks = find_chests()
+    global marks, last_area, settling, chest_list, chest_frames
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return
+
+    # Everything held onto from the area you left is being taken apart, and asking
+    # any of it anything takes the game down. So it is all dropped, and nothing is
+    # looked at again until the new area has settled.
+    try:
+        here = str(pc.WorldInfo.GetMapName(True))
+    except Exception:
+        here = last_area
+
+    if here != last_area:
+        last_area = here
+        settling = SETTLE_SWEEPS
+        chest_list = []
+        chest_frames = 0
+        kinds.clear()
+        hidden.clear()
+        marks = []
+        return
+
+    if settling > 0:
+        settling -= 1
+        marks = []
+        return
+
+    marks = find_chests()
 
     global carried
     carried = worst_carried() if BetterOnly.value is True else {}

@@ -1,5 +1,5 @@
 [project]
-name = "Move Speed"
+name = "Movement Speed Changer"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Sets how fast you walk, run, aim, crouch and drive.
@@ -7,7 +7,7 @@ description = """Sets how fast you walk, run, aim, crouch and drive.
 For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 
 [tool.sdkmod]
-name = "Move Speed"
+name = "Movement Speed Changer"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"

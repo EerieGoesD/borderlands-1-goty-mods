@@ -11,6 +11,10 @@ from mods_base.options import ButtonOption, DropdownOption
 
 NOTHING = "None found"
 
+# Frames between looks at where you have been, so the list is ready without asking.
+REFRESH_FRAMES = 120
+frames = REFRESH_FRAMES
+
 # The places you can go, by the name shown in the list.
 places: dict[str, str] = {}
 
@@ -50,6 +54,22 @@ def on_refresh(_option) -> None:
     Pick.choices = names
     if Pick.value not in names:
         Pick.value = names[0]
+
+
+@hook(
+    hook_func="WillowGame.WillowGFxMenuScreenGeneric:Screen_Activate",
+    hook_type=Type.PRE,
+    immediately_enable=True,
+)
+def on_menu_screen(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The list is filled in just before a menu screen is drawn, so it is ready the
+    first time you open the mod's settings rather than the second."""
+    on_refresh(Refresh)
 
 
 def shut_the_menu() -> None:
@@ -112,7 +132,14 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """The trip itself, made the moment the game is running again."""
-    global waiting
+    global waiting, frames
+
+    # The list is kept up to date on its own, since at startup you have not loaded
+    # a character yet and there is nowhere to go.
+    frames += 1
+    if frames >= REFRESH_FRAMES:
+        frames = 0
+        on_refresh(Refresh)
 
     if waiting is None:
         return

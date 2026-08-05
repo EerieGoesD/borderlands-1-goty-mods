@@ -23,6 +23,20 @@ ACCURACY_FIELDS = ("accuracy", "acc")
 TAGS = re.compile(r"<[^>]+>")
 NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
+# One paragraph of the card's text. The game rewrites whatever we put there into its
+# own wrapping, so a whole paragraph is taken at a time and read without its tags.
+BLOCK = re.compile(r"<TEXTFORMAT.*?</TEXTFORMAT>|<font.*?</font>", re.IGNORECASE | re.DOTALL)
+
+
+def without_ours(text: str) -> str:
+    """The card's text with our own lines taken out, however the game has written them."""
+
+    def drop(match: re.Match[str]) -> str:
+        plain = TAGS.sub("", match.group(0)).strip()
+        return "" if plain.startswith((LABEL, SHIELD_LABEL)) else match.group(0)
+
+    return "\n".join(line for line in BLOCK.sub(drop, text).split("\n") if line.strip())
+
 DisregardAccuracy = BoolOption("Disregard Accuracy", True, "Yes", "No")
 DisregardCritical = BoolOption("Disregard Critical", True, "Yes", "No")
 DisregardElements = BoolOption("Disregard Elements", False, "Yes", "No")
@@ -404,20 +418,16 @@ def get_shield_score(item: UObject) -> float | None:
 
 def apply_line(movie: UObject, card: str, label: str, value: float | None) -> None:
     path = f"{card}.funstats.htmlText"
-    lines = [
-        line
-        for line in get_string(movie, path).split("\n")
-        if not TAGS.sub("", line).startswith((LABEL, SHIELD_LABEL))
-    ]
+    text = without_ours(get_string(movie, path))
 
     if value is not None:
-        lines.insert(
-            0,
+        line = (
             f'<font size="{FontSize.value}" color="#ffd200">'
-            f"{label} {round(value):,}</font>",
+            f"{label} {round(value):,}</font>"
         )
+        text = f"{line}\n{text}" if text else line
 
-    movie.SetVariableString(path, "\n".join(lines))
+    movie.SetVariableString(path, text)
 
 
 def apply_dps(movie: UObject, card: str, weapon: UObject | None) -> None:

@@ -66,7 +66,14 @@ carried: dict[str, float] = {}
 
 
 def can_take(pickup: UObject, pawn: UObject) -> bool:
-    """Whether you could actually pick this up, so full ammo drops out."""
+    """Whether you could actually pick this up, so full ammo drops out.
+
+    Only ammo and money can be full up. Guns and gear always count as takeable,
+    even ones asking for a higher level than you have, since those still go in
+    your bag to use later.
+    """
+    if kind_of(pickup) == "gear":
+        return True
     try:
         return pickup.Inventory.CanBeUsedBy(pawn) is True
     except Exception:
@@ -496,6 +503,14 @@ def sweep() -> None:
     if not hiding and hidden:
         restore_all()
 
+    # What the game is currently drawing, asked of the game itself rather than
+    # remembered, so anything left off the screen earlier gets put back.
+    hud = pc.myHUD
+    try:
+        on_screen = set(hud.PostRenderedActors) if hud is not None else set()
+    except Exception:
+        on_screen = None
+
     for pickup in unrealsdk.find_all("WillowPickup"):
         try:
             if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
@@ -515,11 +530,12 @@ def sweep() -> None:
             show = better
 
         if hiding:
-            hud = pc.myHUD
-            full = HideFull.value is True and not takeable
             if show:
-                if pickup in hidden:
-                    hidden.discard(pickup)
+                missing = (
+                    pickup in hidden if on_screen is None else pickup not in on_screen
+                )
+                hidden.discard(pickup)
+                if missing:
                     try:
                         if hud is not None:
                             hud.AddPostRenderedActor(pickup)

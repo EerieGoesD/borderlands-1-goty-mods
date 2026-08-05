@@ -35,8 +35,9 @@ GREEN = (90, 220, 90)
 BLUE = (90, 180, 255)
 BLACK = (0, 0, 0)
 
-# Where the black pass goes, all the way round the words.
-OUTLINE_STEPS = ((-1, 0), (1, 0), (0, -1), (0, 1))
+# Where the black pass goes. One behind and to the side costs a single extra
+# drawing of each line rather than four.
+OUTLINE_STEPS = ((1, 1),)
 
 # Missions where a known bug can cost you an achievement.
 # The Crimson Armory door only stays open while one of these is active and unfinished,
@@ -52,8 +53,9 @@ WARNING_TEXT = "Careful! Possible missable/glitched achievement"
 # How often the panel and the mission lookup refresh, in frames.
 REFRESH_FRAMES = 300
 
-# How often we check whether a shop screen is up, in frames.
-SHOP_FRAMES = 20
+# How often we check whether a shop screen is up, in frames. Looking for one means
+# going through everything the game holds, which is the dearest thing here.
+SHOP_FRAMES = 90
 
 Position = SpinnerOption(
     "Position",

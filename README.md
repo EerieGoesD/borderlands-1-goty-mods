@@ -27,4 +27,4 @@ Questions or feedback: eeriegoesd@gmail.com or [eeriegoesd.com](https://eeriegoe
 
 ## Support
 
-If you'd like to support my mods, feel free to [buy me a coffee](https://buymeacoffee.com/eeriegoesd).
+If you'd like to support my mods or other projects, feel free to [buy me a coffee](https://buymeacoffee.com/eeriegoesd).

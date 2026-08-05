@@ -1,14 +1,7 @@
 # Crash Debug
 
-Keeps a running note of what every mod was doing, so a crash leaves a record of the last
-thing that ran.
-
-A crash like this kills the game outright, so nothing can run afterwards to write a
-report. Instead the note is written as it happens, and the last line in it names the mod
-the game died inside.
-
-Each line is numbered. The highest number is the newest, and a line with no matching
-finish is where it stopped.
+Keeps a running note of what every mod is doing so if the game crashes you can check the
+last mod that ran, allowing you to debug.
 
 ## Settings
 

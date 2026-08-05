@@ -1,9 +1,7 @@
 # Run And Walk
 
-Walking is what you do by default. Hold Shift to run, or press Caps Lock to run for good.
-
-Shift always does the opposite of the toggle, so with auto run on, holding Shift walks.
-The run stops on its own when you stand still, aim down sights, or leave the ground.
+You walk by default. Hold Shift to run, or press Caps Lock to switch for good. With auto
+run on, Shift walks instead.
 
 ## Settings
 

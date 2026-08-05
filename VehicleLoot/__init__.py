@@ -134,7 +134,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[Reach, LootWeapons, LootMoney, LootAmmo],
+    options=[LootWeapons, LootMoney, LootAmmo, Reach],
     keybinds=[],
     hooks=[on_render],
     commands=[],

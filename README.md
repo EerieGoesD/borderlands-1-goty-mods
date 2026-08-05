@@ -12,6 +12,8 @@ Tested on GOTY only, not on GOTY Enhanced.
 | [Vehicle Loot](VehicleLoot) | Picks loot up while you drive |
 | [Use No Reload](UseNoReload) | Stops the Use key reloading your gun |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
+| [Run And Walk](RunAndWalk) | Hold Shift to run, Caps Lock to run for good |
+| [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim and crouch |
 
 ## Install
 

@@ -11,7 +11,8 @@ are changing it from.
 - **Running**: the speed of a sprint.
 - **Aiming**: the speed while looking down sights.
 - **Crouching**: the speed while crouched.
-- **Show movement speed [DEBUG]**: prints your speed and which of the four is in use.
+- **Driving**: the top speed of any vehicle you are driving.
+- **Show movement speed [DEBUG]**: prints your speed and which of the five is in use.
 
 ## Install
 

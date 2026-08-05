@@ -37,7 +37,7 @@ Needs the [BL1 PythonSDK](https://github.com/bl-sdk/willow1-mod-manager).
 
 ## Contact
 
-Questions or feedback: eeriegoesd@gmail.com or eeriegoesd.com
+Questions or feedback: eeriegoesd@gmail.com or [eeriegoesd.com](https://eeriegoesd.com)
 
 ## Support
 

@@ -532,6 +532,8 @@ def on_card_hover(
 # Enhanced fills its cards at a moment the original does not, and without these two
 # the reading never appears there. In the original the card is not ready this early,
 # and writing then would wipe the bonus lines, so they are only used on Enhanced.
+
+
 @hook(
     hook_func="WillowGame.StatusMenuExGFxMovie:UpdateCardPanel",
     hook_type=Type.POST,
@@ -560,7 +562,9 @@ def on_vendor_panel(
     update_cards(obj)
 
 
-ENHANCED_ONLY = (on_card_panel, on_vendor_panel)
+# Neither of these is used at the moment: they fill the card before the game has
+# put its bonus lines on, which loses them.
+ENHANCED_ONLY = ()
 
 
 @hook(

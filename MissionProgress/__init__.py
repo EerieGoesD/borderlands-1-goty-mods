@@ -33,6 +33,10 @@ GREY = (150, 150, 150)
 RED = (230, 60, 60)
 GREEN = (90, 220, 90)
 BLUE = (90, 180, 255)
+BLACK = (0, 0, 0)
+
+# Where the black pass goes, all the way round the words.
+OUTLINE_STEPS = ((-1, 0), (1, 0), (0, -1), (0, 1))
 
 # Missions where a known bug can cost you an achievement.
 # The Crimson Armory door only stays open while one of these is active and unfinished,
@@ -46,7 +50,7 @@ RISKY_MISSIONS = {
 WARNING_TEXT = "Careful! Possible missable/glitched achievement"
 
 # How often the panel and the mission lookup refresh, in frames.
-REFRESH_FRAMES = 60
+REFRESH_FRAMES = 300
 
 # How often we check whether a shop screen is up, in frames.
 SHOP_FRAMES = 20
@@ -78,15 +82,25 @@ font = None
 colours: dict[tuple[int, int, int], object] = {}
 
 
+# How many times to go looking for missions the game has not loaded yet. Some are
+# never loaded at all, so this stops rather than sweeping every object for ever.
+LOOKUPS = 20
+lookups = 0
+
+
 def find_definitions() -> None:
     """Matches the flow list against the game's own mission objects, by display name.
 
-    The game only loads a mission's data when it needs it, so this keeps looking until
-    every mission in the flow has been seen.
+    The game only loads a mission's data when it needs it, so this looks again now and
+    then, up to a point.
     """
+    global lookups
+
     wanted = set(ALL_MISSIONS)
-    if wanted <= set(definitions):
+    if wanted <= set(definitions) or lookups >= LOOKUPS:
         return
+
+    lookups += 1
 
     for mission in unrealsdk.find_all("MissionDefinition"):
         try:
@@ -268,7 +282,7 @@ def on_render(
                     B=colour[2],
                     A=255,
                 )
-                for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE)
+                for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE, BLACK)
             }
 
         where = Position.value
@@ -302,6 +316,13 @@ def on_render(
                 trimmed_lines.append((line, colour))
 
         for line, colour in trimmed_lines:
+            # A black pass all the way round first, so the words stand out against
+            # whatever is behind them.
+            canvas.DrawColor = colours[BLACK]
+            for across, down in OUTLINE_STEPS:
+                canvas.SetPos(left + across, y + down)
+                canvas.DrawText(line, False, TEXT_SCALE, TEXT_SCALE)
+
             canvas.DrawColor = colours[colour]
             canvas.SetPos(left, y)
             canvas.DrawText(line, False, TEXT_SCALE, TEXT_SCALE)

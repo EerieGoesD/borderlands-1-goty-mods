@@ -85,11 +85,26 @@ frames = 0
 last_area = ""
 
 
+def clear_old_notes(keep: Path) -> None:
+    """Throws away notes left in any other place or under any other ending."""
+    for folder in PLACES.values():
+        for tail in ENDINGS:
+            old = folder / (LOG_STEM + tail)
+            if old == keep:
+                continue
+            try:
+                if old.is_file():
+                    old.unlink()
+            except Exception:
+                continue
+
+
 def start_log(place: str | None = None, ending: str | None = None) -> None:
     """Opens the note and writes the heading."""
     global log_file, written
 
     stop_log()
+    clear_old_notes(log_path(place, ending))
     try:
         log_file = os.open(
             str(log_path(place, ending)),

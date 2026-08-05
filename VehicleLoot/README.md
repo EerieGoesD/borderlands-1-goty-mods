@@ -1,6 +1,6 @@
 # Vehicle Loot
 
-Picks loot up for you while you are driving.
+Picks loot up while you are driving.
 
 Anything within reach of the vehicle is collected as you drive past, so you never have
 to get out.

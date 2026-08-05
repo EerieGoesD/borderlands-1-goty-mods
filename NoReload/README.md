@@ -1,6 +1,6 @@
 # No Reload
 
-Your magazine never runs down, so there is nothing to reload.
+Your magazine never runs down.
 
 ## Install
 

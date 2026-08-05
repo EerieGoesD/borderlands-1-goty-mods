@@ -1,6 +1,6 @@
 # Reset Chests
 
-Shuts every red and white chest you have opened in this area, ready to be looted again.
+Shuts every red and white chest you have opened in this area.
 
 ## Settings
 

@@ -1,7 +1,7 @@
 # Crash Debug
 
-Keeps a running note of what every mod is doing so if the game crashes you can check the
-last mod that ran, allowing you to debug.
+Keeps a running note of what every mod is doing, so after a crash you can see which one
+ran last.
 
 ## Settings
 

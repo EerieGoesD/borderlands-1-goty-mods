@@ -1,7 +1,6 @@
 # Run And Walk
 
-You walk by default. Hold Shift to run, or press Caps Lock to switch for good. With auto
-run on, Shift walks instead.
+You walk by default. Hold Shift to run, or press Caps Lock to switch for good.
 
 ## Settings
 

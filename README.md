@@ -9,8 +9,8 @@ Tested on both GOTY and GOTY Enhanced.
 | [Crash Debug](CrashDebug) | Notes what each mod is doing, so a crash says which one ran last |
 | [Gear Score](WeaponScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
-| [Infinite Ammo](InfiniteAmmo) | Firing never uses up your ammo |
-| [Infinite Health](InfiniteHealth) | Nothing can take your health down |
+| [Infinite Ammo](InfiniteAmmo) | Unlimited ammo. No reload option |
+| [Infinite Health](InfiniteHealth) | God-mode basically |
 | [Jump Higher](JumpHigher) | Lets you jump higher than the game allows |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
 | [Mission Progress](MissionProgress) | Mission progress (total game progression %) tracker |

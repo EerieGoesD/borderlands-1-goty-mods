@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import unrealsdk  # type: ignore
@@ -18,7 +19,7 @@ TEXT_SCALE = 1.0
 COLOUR = (255, 210, 0)
 
 # Frames between recalculations.
-REFRESH_FRAMES = 30
+REFRESH_FRAMES = 60
 
 ShowDistance = BoolOption("Show Distance", True, "On", "Off")
 ShowRoute = BoolOption("Show Route Line", True, "On", "Off")
@@ -58,7 +59,12 @@ COMPASS_LIFT = 40
 TOP_HEIGHT = 90
 
 # The route line.
-ROUTE_MAX_POINTS = 45
+ROUTE_MAX_POINTS = 26
+
+# Steps shorter than this on screen are rolled into the next one, and only steps
+# this long get the soft halo under them.
+TINY_STEP = 10
+HALO_STEP = 24
 ROUTE_LIFT = 12.0
 ROUTE_SKIP = 250.0
 
@@ -78,7 +84,9 @@ SIGHT_TRIES = 8
 EYE_LIFT = 60.0
 
 # Walking ground that leaves you this share of the distance away counts as a dead end.
-DEAD_END_SHARE = 0.7
+# Somewhere in another area is a long way off, and the ground here only ever covers
+# part of it, so anything that makes real headway is worth walking.
+DEAD_END_SHARE = 0.98
 
 frames = REFRESH_FRAMES
 cached_text = ""
@@ -128,6 +136,21 @@ def bearing_to(here, there) -> float:
     return offset
 
 
+class Spot:
+    """A copy of a place, kept apart from whatever in the world it came from.
+
+    Holding onto the game's own position would leave a reading of an area that has
+    since been unloaded, which takes the game down.
+    """
+
+    __slots__ = ("X", "Y", "Z")
+
+    def __init__(self, where) -> None:
+        self.X = float(where.X)
+        self.Y = float(where.Y)
+        self.Z = float(where.Z)
+
+
 def distance_to(here, there) -> float | None:
     try:
         dx = float(here.X) - float(there.X)
@@ -138,10 +161,15 @@ def distance_to(here, there) -> float | None:
     return (dx * dx + dy * dy + dz * dz) ** 0.5
 
 
+# How many checks to sit out while an area is being swapped in, at one a second.
+SETTLE_CHECKS = 3
+settling = 0
+
 candidates: list[UObject] = []
 turn_ins: list[UObject] = []
 exits: list[UObject] = []
 givers: list[UObject] = []
+doorways: dict[str, UObject] = {}
 candidate_mission: UObject | None = None
 candidate_levels: frozenset = frozenset()
 candidate_targets: tuple = ()
@@ -192,10 +220,11 @@ def collect_exits(mission: UObject, live: frozenset, targets: tuple) -> None:
     """The ways out of this area, which only change when the area does."""
     global exits, candidate_mission, candidate_levels, candidate_targets
 
-    global givers
+    global givers, doorways
 
     exits = []
     givers = []
+    doorways = {}
     candidate_mission = mission
     candidate_levels = live
     candidate_targets = targets
@@ -212,10 +241,69 @@ def collect_exits(mission: UObject, live: frozenset, targets: tuple) -> None:
         elif "MissionDirector" in definition:
             givers.append(thing)
 
+    # The game marks each border with the area on the far side of it, which is what
+    # tells one way out from another.
+    for landmark in unrealsdk.find_all("PersistentTransitionLandmark"):
+        try:
+            if live and landmark.Outer not in live:
+                continue
+            doorways[str(landmark.ToMapName).lower()] = landmark
+        except Exception:
+            continue
+
+
+def border_to(mission: UObject) -> UObject | None:
+    """The way out leading towards the area the objective is in, if it is elsewhere."""
+    target = getattr(mission, "TargetWaypointDefinition", None)
+    if target is None:
+        return None
+
+    landmark = None
+    for field in ("SubLevelName", "PersistentLevelName"):
+        area = getattr(target, field, None)
+        if area is None:
+            continue
+        landmark = doorways.get(str(area).lower())
+        if landmark is not None:
+            break
+
+    if landmark is None:
+        return None
+
+    # The border marker itself is not somewhere you can walk to, so the door beside
+    # it is what gets pointed at.
+    try:
+        if getattr(landmark, "bDeleteMe", False) is True:
+            return None
+        spot = landmark.Location
+    except Exception:
+        return None
+
+    best = None
+    best_gap = 0.0
+    for door in exits:
+        # An area change leaves the old doors behind, and asking one of those
+        # anything takes the game down.
+        try:
+            if getattr(door, "bDeleteMe", False) is True:
+                continue
+            gap = distance_to(spot, door.Location)
+        except Exception:
+            continue
+        if gap is not None and (best is None or gap < best_gap):
+            best = door
+            best_gap = gap
+
+    return best
+
 
 # Rebuilding the map's markers is not cheap, so the answer is kept between checks.
 map_spot = None
 map_for: tuple = ()
+
+# Seconds to wait before asking again when the map had no marker to give.
+MAP_RETRY = 2.0
+map_asked = 0.0
 
 
 def map_waypoint(live: frozenset):
@@ -224,15 +312,16 @@ def map_waypoint(live: frozenset):
     This is the game's own answer, and it covers the case where the objective sits in
     another area, since the map then marks the way through.
     """
-    global map_spot, map_for
+    global map_spot, map_for, map_asked
 
     found = None
     pc = get_pc()
 
     # Only worth rebuilding when the mission moved on or you changed area. With no
     # marker in hand it keeps asking, since a fresh area has none until the game
-    # builds them.
+    # builds them, but not on every single check.
     try:
+        now = float(pc.WorldInfo.TimeSeconds)
         mission = list(unrealsdk.find_all("MissionTracker"))[-1].ActiveMission
         mark = (
             mission,
@@ -243,11 +332,20 @@ def map_waypoint(live: frozenset):
         if map_spot is not None and mark == map_for:
             return map_spot
         map_for = mark
+        map_asked = now
     except Exception:
         return map_spot
 
     for helper in unrealsdk.find_all("WillowGFxHelperMap"):
         try:
+            # One on its way out takes the game down if it is asked anything, which
+            # is what an area change is full of. Not every one carries these marks,
+            # and a missing one is not a reason to skip it.
+            if getattr(helper, "bDeleteMe", False) is True:
+                continue
+            if getattr(helper, "bPendingDelete", False) is True:
+                continue
+
             # Areas you have left keep their own copy, holding the waypoint they had
             # at the time. Only the one anchored in an area still in play counts.
             if helper.PlayerOwner is not pc:
@@ -308,7 +406,7 @@ def waypoint_distance() -> float | None:
     While the objective sits in another area the compass points at the way out, so the
     nearest of the mission's own waypoint and the exit is the one that counts.
     """
-    global cached_target
+    global cached_target, settling
 
     try:
         mission = list(unrealsdk.find_all("MissionTracker"))[-1].ActiveMission
@@ -319,14 +417,28 @@ def waypoint_distance() -> float | None:
     # The route needs the walking network whichever way the target is found.
     live = frozenset(loaded_levels())
     if live != graph_levels:
+        # A new area is still being swapped in, and the one you left is being taken
+        # apart piece by piece. Asking any of it anything takes the game down, so
+        # nothing is read until it has settled.
+        if settling < SETTLE_CHECKS:
+            settling += 1
+            cached_target = None
+            return None
+        settling = 0
         build_graph(live)
+    else:
+        settling = 0
 
     # The map screen's own waypoint marker is the answer whenever it has one.
     spot = map_waypoint(live)
 
     if spot is not None:
-        cached_target = spot
-        return distance_to(here, spot)
+        try:
+            cached_target = Spot(spot)
+        except Exception:
+            cached_target = None
+            return None
+        return distance_to(here, cached_target)
 
     if mission is None:
         return None
@@ -346,7 +458,10 @@ def waypoint_distance() -> float | None:
 
     # Once the objectives are done the compass points at the hand in, not at them.
     # The old objective markers stay in the world, so they are dropped entirely.
-    order = (candidates, turn_ins, exits)
+    # The hand in is not where you are headed while there is still work to do, so with
+    # the objective sitting in another area the border towards it is the answer, and
+    # any way out will have to do when the game does not name one.
+    order = (candidates, [door] if (door := border_to(mission)) is not None else exits)
     if not still_doing(mission):
         # Ways out carry nothing about where they lead, so when the hand in is in
         # another area there is nothing honest to point at.
@@ -360,7 +475,7 @@ def waypoint_distance() -> float | None:
                 # Parts of the objective you have already done stay in the world.
                 if getattr(actor, "bCompleted", False) is True:
                     continue
-                spot = actor.Location
+                spot = Spot(actor.Location)
                 distance = distance_to(here, spot)
             except Exception:
                 continue
@@ -400,6 +515,7 @@ def build_graph(live: frozenset) -> None:
     cached_route = []
     route_from = None
     index: dict = {}
+    by_guid: dict = {}
     nodes: list = []
 
     for node in unrealsdk.find_all("NavigationPoint", False):
@@ -411,6 +527,10 @@ def build_graph(live: frozenset) -> None:
         except Exception:
             continue
         index[node] = len(nodes)
+        try:
+            by_guid[str(node.NavGuid)] = len(nodes)
+        except Exception:
+            pass
         nodes.append(node)
         graph_pos.append(here)
 
@@ -423,6 +543,10 @@ def build_graph(live: frozenset) -> None:
         for spec in specs:
             try:
                 other = index.get(spec.End.Actor)
+                if other is None:
+                    # Steps that cross from one part of the area into the next name
+                    # the spot on the far side by its mark rather than outright.
+                    other = by_guid.get(str(spec.End.Guid))
                 if other is None or other == i:
                     continue
                 cost = float(spec.Distance)
@@ -608,9 +732,9 @@ def find_route(
         if walk:
             return walk
 
-        # Nowhere to walk from here, so point straight at the target for now
-        # rather than showing nothing.
-        start = reachable[0]
+        # Nowhere to walk from here. A straight line would run through the scenery,
+        # so nothing is shown at all.
+        return []
 
     path = [start]
     while path[-1] != goal:
@@ -790,8 +914,6 @@ def draw_route(canvas, here) -> None:
         green = unrealsdk.make_struct("Color", R=core[0], G=core[1], B=core[2], A=255)
         glow = unrealsdk.make_struct("Color", R=halo[0], G=halo[1], B=halo[2], A=70)
 
-    import math
-
     pc = get_pc()
     try:
         pawn = pc.Pawn
@@ -876,8 +998,16 @@ def draw_route(canvas, here) -> None:
         if (a[1] < 0 and b[1] < 0) or (a[1] > height and b[1] > height):
             return
 
-        canvas.Draw2DLine(a[0], a[1] - 2, b[0], b[1] - 2, glow)
-        canvas.Draw2DLine(a[0], a[1] + 3, b[0], b[1] + 3, glow)
+        # Far off, a step is only a couple of pixels long and costs as much to draw
+        # as a near one, so the halo is left off and short ones are skipped.
+        reach = abs(a[0] - b[0]) + abs(a[1] - b[1])
+        if reach < TINY_STEP:
+            return
+
+        if reach >= HALO_STEP:
+            canvas.Draw2DLine(a[0], a[1] - 2, b[0], b[1] - 2, glow)
+            canvas.Draw2DLine(a[0], a[1] + 3, b[0], b[1] + 3, glow)
+
         canvas.Draw2DLine(a[0], a[1], b[0], b[1], green)
         canvas.Draw2DLine(a[0], a[1] + 1, b[0], b[1] + 1, green)
 
@@ -886,6 +1016,9 @@ def draw_route(canvas, here) -> None:
         point = to_screen(x, y, z)
         if point is None:
             last = None
+            continue
+        if last is not None and abs(last[0] - point[0]) + abs(last[1] - point[1]) < TINY_STEP:
+            # Keep the last drawn spot so the short steps add up rather than vanish.
             continue
         stroke(last, point)
         last = point

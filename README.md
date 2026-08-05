@@ -14,6 +14,7 @@ Tested on GOTY only, not on GOTY Enhanced.
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Run And Walk](RunAndWalk) | Hold Shift to run, Caps Lock to run for good |
 | [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
+| [Crash Debug](CrashDebug) | Notes what each mod was doing, so a crash says which one |
 
 ## Install
 

@@ -6,7 +6,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
-from mods_base.options import BoolOption, SliderOption
+from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
 from .missions import ALL_MISSIONS, BASE_ONLY, WITH_DLC
 
@@ -15,11 +15,14 @@ FONT = "ui_fonts.font_willowbody_18pt"
 # 0 is not started, 1 is active, 4 is complete.
 STATUS_COMPLETE = 4
 
-# Panel geometry, in pixels from the top right corner.
+# Panel geometry, in pixels.
 PANEL_WIDTH = 460
 PANEL_TOP = 60
 LINE_HEIGHT = 28
 TEXT_SCALE = 1.0
+
+# How far the panel keeps clear of the screen edge.
+PANEL_MARGIN = 20
 
 # Longest line that fits the panel, anything past this is cut short.
 MAX_CHARS = 46
@@ -45,6 +48,15 @@ WARNING_TEXT = "Careful! Possible missable/glitched achievement"
 # How often the panel and the mission lookup refresh, in frames.
 REFRESH_FRAMES = 60
 
+# How often we check whether a shop screen is up, in frames.
+SHOP_FRAMES = 20
+
+Position = SpinnerOption(
+    "Position",
+    value="Top right",
+    choices=["Top right", "Top left", "Top centre"],
+    wrap_enabled=True,
+)
 EnableDLC = BoolOption("Enable DLC Missions", True, "Yes", "No")
 NextCount = SliderOption("Upcoming missions shown", 3, 0, 8, 1, True)
 ShowSkipped = BoolOption("Flag Skipped Missions", True, "On", "Off")
@@ -54,6 +66,13 @@ definitions: dict[str, UObject] = {}
 
 frames = REFRESH_FRAMES
 cached_lines: list[tuple[str, tuple[int, int, int]]] = []
+trimmed_lines = None
+
+# Whether a shop screen is up, and the count until that is asked again. Only the
+# answer is kept, never the screens themselves, since those belong to the area you
+# are in and asking one of them anything after you leave takes the game down.
+shop_open = False
+shop_frames = SHOP_FRAMES
 
 font = None
 colours: dict[tuple[int, int, int], object] = {}
@@ -187,6 +206,8 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
+    global frames, cached_lines, trimmed_lines, shop_open, shop_frames
+
     pc = get_pc()
     if pc is None or pc.myHUD is None:
         return
@@ -195,17 +216,44 @@ def on_render(
     if pc.Pawn is None:
         return
 
+    # Out of the way while a menu, a shop or the pause screen is up.
+    try:
+        if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
+            return
+
+        # A shop screen counts too. Hunting for one every frame is far too slow, so
+        # it is asked now and then and only the yes or no is kept.
+        shop_frames += 1
+        if shop_frames >= SHOP_FRAMES:
+            shop_frames = 0
+            shop_open = False
+            for shop in unrealsdk.find_all("VendingMachineGFxMovie"):
+                try:
+                    if "Default__" in str(shop.Name):
+                        continue
+                    if shop.bMovieIsOpen is True:
+                        shop_open = True
+                        break
+                except Exception:
+                    continue
+
+        if shop_open:
+            return
+    except Exception:
+        pass
+
     canvas = __args.Canvas
     if canvas is None:
         return
-
-    global frames, cached_lines
 
     frames += 1
     if frames >= REFRESH_FRAMES:
         frames = 0
         find_definitions()
-        cached_lines = build_lines()
+        fresh = build_lines()
+        if fresh != cached_lines:
+            cached_lines = fresh
+            trimmed_lines = None
 
     global font, colours
 
@@ -223,14 +271,40 @@ def on_render(
                 for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE)
             }
 
-        left = canvas.SizeX - PANEL_WIDTH
+        where = Position.value
+        if where == "Top left":
+            left = PANEL_MARGIN
+        elif where == "Top centre":
+            left = (canvas.SizeX - PANEL_WIDTH) / 2
+        else:
+            left = canvas.SizeX - PANEL_WIDTH - PANEL_MARGIN
+
         y = PANEL_TOP
 
         canvas.Font = font
-        for text, colour in cached_lines:
+
+        # A line wider than the panel wraps round to the far side of the screen, so
+        # it is cut short until it fits. Measuring is not cheap, so it is done once
+        # for each new set of lines rather than every frame.
+        if trimmed_lines is None:
+            trimmed_lines = []
+            for text, colour in cached_lines:
+                line = text
+                for _ in range(len(text)):
+                    try:
+                        width = float(canvas.TextSize(line, TEXT_SCALE, TEXT_SCALE)[0])
+                    except Exception:
+                        # No measurement to be had, so the character cap has to do.
+                        break
+                    if width <= PANEL_WIDTH or len(line) <= 4:
+                        break
+                    line = line[:-4] + "..."
+                trimmed_lines.append((line, colour))
+
+        for line, colour in trimmed_lines:
             canvas.DrawColor = colours[colour]
             canvas.SetPos(left, y)
-            canvas.DrawText(text, False, TEXT_SCALE, TEXT_SCALE)
+            canvas.DrawText(line, False, TEXT_SCALE, TEXT_SCALE)
             y += LINE_HEIGHT
     except Exception as ex:
         logging.dev_warning(f"[Mission Progress] could not draw ({ex})")
@@ -241,7 +315,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[EnableDLC, ShowSkipped, ShowWarnings, NextCount],
+    options=[EnableDLC, ShowSkipped, ShowWarnings, NextCount, Position],
     keybinds=[],
     hooks=[on_render],
     commands=[],

@@ -16,6 +16,20 @@ COLOUR = "#ff4040"
 
 TAGS = re.compile(r"<[^>]+>")
 
+# One paragraph of the card's text. The game rewrites whatever we put there into its
+# own wrapping, so a whole paragraph is taken at a time and read without its tags.
+BLOCK = re.compile(r"<TEXTFORMAT.*?</TEXTFORMAT>|<font.*?</font>", re.IGNORECASE | re.DOTALL)
+
+
+def without_ours(text: str) -> str:
+    """The card's text with our own line taken out, however the game has written it."""
+
+    def drop(match: re.Match[str]) -> str:
+        plain = TAGS.sub("", match.group(0)).strip()
+        return "" if plain.startswith(LABEL) else match.group(0)
+
+    return "\n".join(line for line in BLOCK.sub(drop, text).split("\n") if line.strip())
+
 FontSize = SliderOption("Sell value font size", 9, 0, 24, 1, True)
 
 # The item you started a comparison from.
@@ -53,21 +67,15 @@ def sell_price(item: UObject | None) -> int | None:
 
 def apply_line(movie: UObject, card: str, item: UObject | None) -> None:
     path = f"{card}.funstats.htmlText"
-    lines = [
-        line
-        for line in get_string(movie, path).split("\n")
-        if not TAGS.sub("", line).startswith(LABEL)
-    ]
+    text = without_ours(get_string(movie, path))
 
     price = sell_price(item)
     if price is not None:
-        lines.insert(
-            0,
-            f'<font size="{FontSize.value}" color="{COLOUR}">{LABEL} ${price:,}</font>',
-        )
+        line = f'<font size="{FontSize.value}" color="{COLOUR}">{LABEL} ${price:,}</font>'
+        text = f"{line}\n{text}" if text else line
 
     try:
-        movie.SetVariableString(path, "\n".join(lines))
+        movie.SetVariableString(path, text)
     except Exception as ex:
         logging.dev_warning(f"[Sell Value] could not write the card ({ex})")
 

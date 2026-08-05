@@ -1,16 +1,17 @@
 [project]
-name = "Movement Speed Changer"
+name = "No Skill Cooldown"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Sets how fast you walk, run, aim, crouch and drive.
+description = """Your action skill is ready every time you press the key.
 
 For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 
 [tool.sdkmod]
-name = "Movement Speed Changer"
+name = "No Skill Cooldown"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = "True"
-download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/MoveSpeed/MoveSpeed.sdkmod"
+
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/NoSkillCooldown/NoSkillCooldown.sdkmod"
 license = {name = "All rights reserved" }

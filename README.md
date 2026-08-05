@@ -14,9 +14,11 @@ Tested on both GOTY and GOTY Enhanced.
 | [Jump Higher](JumpHigher) | Lets you jump higher than the game allows |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
 | [Mission Progress](MissionProgress) | Mission progress (total game progression %) tracker |
-| [Move Speed](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
+| [Movement Speed Changer](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
 | [No Backpack Limit](NoBackpackLimit) | Lets you carry as much as you like |
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
+| [No Reload](NoReload) | Your magazine never runs down, so there is nothing to reload |
+| [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |
 | [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
 | [Reset Chests](ResetChests) | Shuts every red and white chest you have opened in this area |

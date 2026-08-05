@@ -32,6 +32,11 @@ def on_render(
             return
         if int(gun.AutomaticBurstCount) != NO_BURST:
             gun.AutomaticBurstCount = NO_BURST
+
+        # A burst gun counts its shots, and a count left standing after you let go
+        # makes it swallow the next click. It is held at nothing.
+        if int(gun.CurrentBurstShotCount) != 0:
+            gun.CurrentBurstShotCount = 0
     except Exception as ex:
         logging.dev_warning(f"[Continuous Fire] could not settle the gun ({ex})")
 

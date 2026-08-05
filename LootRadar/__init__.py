@@ -126,6 +126,10 @@ def gun_dps(weapon: UObject) -> float | None:
         return None
 
 
+# Shields are weighed against each other, over a minute of fighting.
+SHIELD_FAMILY = "shield"
+SHIELD_WINDOW = 60.0
+
 # The game has several names for each sort of gun, and they all count as one sort.
 # Snipers are checked before rifles, since the game calls them sniper rifles.
 FAMILY_WORDS = (
@@ -154,8 +158,32 @@ def gun_family(weapon: UObject) -> str | None:
     return kind
 
 
+def shield_score(item: UObject) -> float | None:
+    """Damage a shield soaks over a minute: its capacity plus everything it recharges.
+
+    Shields keep their numbers in a list rather than as plain properties, and anything
+    without a capacity in that list is not a shield.
+    """
+    stats: dict[str, float] = {}
+    try:
+        definition = item.DefinitionData.ItemDefinition
+        for index, modifier in enumerate(item.UIStatModifiers):
+            name = str(definition.UIStats[index].Attribute).rsplit(".", 1)[-1].rstrip("'")
+            stats[name] = float(modifier.ModifierTotal)
+    except Exception:
+        return None
+
+    capacity = stats.get("ShieldMaxValue")
+    rate = stats.get("ShieldOnIdleRegenerationRate")
+    if capacity is None or rate is None:
+        return None
+
+    delay = stats.get("ShieldOnIdleRegenerationDelay", 0.0)
+    return capacity + rate * max(SHIELD_WINDOW - delay, 0)
+
+
 def worst_carried() -> dict[str, float]:
-    """The weakest gun you carry of each sort, held and stowed alike."""
+    """The weakest gun of each sort and the weakest shield you carry, held and stowed."""
     lowest: dict[str, float] = {}
 
     pc = get_pc()
@@ -165,8 +193,9 @@ def worst_carried() -> dict[str, float]:
     bag: list[UObject] = []
     try:
         manager = pc.Pawn.InvManager
-        # The guns you are carrying, whichever list the game keeps them in.
-        for name in ("Backpack", "InventoryChain"):
+        # What you are carrying, whichever list the game keeps it in. Guns and gear
+        # each have their own chain, so the shield you are wearing is on ItemChain.
+        for name in ("Backpack", "InventoryChain", "ItemChain"):
             held = getattr(manager, name, None)
             if held is None:
                 continue
@@ -180,10 +209,13 @@ def worst_carried() -> dict[str, float]:
     except Exception:
         return lowest
 
-    for weapon in bag:
-        family = gun_family(weapon)
-        score = gun_dps(weapon)
+    for item in bag:
+        family = gun_family(item)
+        score = gun_dps(item)
         if family is None or score is None:
+            family = SHIELD_FAMILY
+            score = shield_score(item)
+        if score is None:
             continue
         if family not in lowest or score < lowest[family]:
             lowest[family] = score
@@ -192,7 +224,7 @@ def worst_carried() -> dict[str, float]:
 
 
 def worth_taking(pickup: UObject) -> bool:
-    """Whether a gun on the ground beats the weakest of its sort in your bag."""
+    """Whether the gun or shield on the ground beats the weakest of its sort in your bag."""
     if BetterOnly.value is False:
         return True
 
@@ -201,13 +233,16 @@ def worth_taking(pickup: UObject) -> bool:
         return True
 
     try:
-        weapon = pickup.Inventory
+        item = pickup.Inventory
     except Exception:
         return True
 
-    family = gun_family(weapon)
-    score = gun_dps(weapon)
+    family = gun_family(item)
+    score = gun_dps(item)
     if family is None or score is None:
+        family = SHIELD_FAMILY
+        score = shield_score(item)
+    if score is None:
         return True
 
     floor = carried.get(family)

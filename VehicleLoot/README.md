@@ -2,8 +2,7 @@
 
 Picks loot up while you are driving.
 
-Anything within reach of the vehicle is collected as you drive past, so you never have
-to get out.
+Anything within reach of the vehicle is collected as you drive past.
 
 ## Settings
 

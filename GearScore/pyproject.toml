@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it (character skills not counted).
 
-For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
+For full information about this mod and to report bugs, please visit: eeriegoesd.com/gaming/mods"""
 
 [tool.sdkmod]
 name = "Gear Score"

@@ -69,7 +69,7 @@ def on_render(
             if float(pc.Pawn.MaxSpeed) < wanted:
                 pc.Pawn.MaxSpeed = wanted
         except Exception as ex:
-            logging.dev_warning(f"[Move Speed] could not set the driving speed ({ex})")
+            logging.dev_warning(f"[Movement Speed Changer] could not set the driving speed ({ex})")
     else:
         try:
             if bool(pc.Pawn.bIsCrouched):
@@ -94,7 +94,7 @@ def on_render(
             if abs(float(pc.Pawn.GroundSpeed) - wanted) > 0.5:
                 pc.Pawn.GroundSpeed = wanted
         except Exception as ex:
-            logging.dev_warning(f"[Move Speed] could not set the speed ({ex})")
+            logging.dev_warning(f"[Movement Speed Changer] could not set the speed ({ex})")
 
     if ShowSpeed.value is False:
         return
@@ -134,7 +134,7 @@ def on_render(
         canvas.SetPos(SPEED_LEFT, SPEED_TOP)
         canvas.DrawText(f"{state}  {moving:.0f} / {top:.0f}", False, 1.0, 1.0)
     except Exception as ex:
-        logging.dev_warning(f"[Move Speed] could not draw the speed ({ex})")
+        logging.dev_warning(f"[Movement Speed Changer] could not draw the speed ({ex})")
 
 
 def on_disable() -> None:
@@ -150,7 +150,7 @@ def on_disable() -> None:
             pc.Pawn.GroundSpeedBaseValue = float(STOCK_WALK)
             pc.Pawn.GroundSpeed = float(STOCK_WALK)
     except Exception as ex:
-        logging.dev_warning(f"[Move Speed] could not put the speed back ({ex})")
+        logging.dev_warning(f"[Movement Speed Changer] could not put the speed back ({ex})")
 
 
 # Gets populated from `build_mod` below
@@ -165,4 +165,4 @@ build_mod(
     settings_file=Path(f"{SETTINGS_DIR}/MovementSpeedChanger.json"),
 )
 
-logging.info(f"Move Speed Loaded: {__version__}, {__version_info__}")
+logging.info(f"Movement Speed Changer Loaded: {__version__}, {__version_info__}")

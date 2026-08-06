@@ -2,7 +2,7 @@
 name = "No Backpack Limit"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Sets how many things your backpack holds.
+description = """Sets the backpack capacity limit.
 
 For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 

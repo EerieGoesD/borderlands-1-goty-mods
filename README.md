@@ -15,7 +15,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
 | [Mission Progress](MissionProgress) | Shows your mission progress and total game completion, following the Borderlands mission flow |
 | [Movement Speed Changer](MovementSpeedChanger) | Sets how fast you walk, run, aim, crouch and drive |
-| [No Backpack Limit](NoBackpackLimit) | Sets how many things your backpack holds |
+| [No Backpack Limit](NoBackpackLimit) | Sets the backpack capacity limit |
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
 | [No Reload](NoReload) | Your magazine never runs down |
 | [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |

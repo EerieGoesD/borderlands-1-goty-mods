@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Picks loot up while you are driving.
 
-For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
+For full information about this mod and to report bugs, please visit: eeriegoesd.com/gaming/mods"""
 
 [tool.sdkmod]
 name = "Vehicle Loot"

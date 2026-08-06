@@ -2,8 +2,7 @@
 
 Your action skill is ready every time you press the key.
 
-Pressing the key while your skill is already out ends it and sets off a fresh one,
-so a turret can be picked up and put back down wherever you like.
+Pressing the key while your action skill is active ends it and starts it again.
 
 ## Install
 

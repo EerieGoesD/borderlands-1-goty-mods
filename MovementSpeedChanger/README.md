@@ -1,6 +1,6 @@
-# Move Speed
+# Movement Speed Changer
 
-Sets how fast you move, with a separate number for each way of moving.
+Sets how fast you walk, run, aim, crouch and drive.
 
 Each slider shows the game's own number next to its name, so you always know what you
 are changing it from.

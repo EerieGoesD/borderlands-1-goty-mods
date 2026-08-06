@@ -2,7 +2,7 @@
 name = "Mission Progress"
 version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Shows your mission progress and total game completion.
+description = """Shows your mission progress and total game completion, following the Borderlands mission flow.
 
 For full information about this mod and to report bugs, please visit: eeriegoesd.com"""
 

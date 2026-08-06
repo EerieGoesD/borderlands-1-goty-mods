@@ -937,7 +937,7 @@ build_mod(
         *(ENHANCED_ONLY if Game.get_current() is Game.BL1E else ()),
     ],
     commands=[],
-    settings_file=Path(f"{SETTINGS_DIR}/WeaponScore.json"),
+    settings_file=Path(f"{SETTINGS_DIR}/GearScore.json"),
 )
 
 patch_shield_delay()

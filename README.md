@@ -7,14 +7,14 @@ Tested on both GOTY and GOTY Enhanced.
 | --- | --- |
 | [Continuous Fire](ContinuousFire) | Guns that fire in bursts keep firing while you hold the trigger |
 | [Crash Debug](CrashDebug) | Notes what each mod is doing, so a crash says which one ran last |
-| [Gear Score](WeaponScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
+| [Gear Score](GearScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Infinite Ammo](InfiniteAmmo) | Unlimited ammo. No reload option |
 | [Infinite Health](InfiniteHealth) | God-mode basically |
 | [Jump Higher](JumpHigher) | Lets you jump higher than the game allows |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
-| [Mission Progress](MissionProgress) | Shows your mission progress and total game completion |
-| [Movement Speed Changer](MoveSpeed) | Sets how fast you walk, run, aim, crouch and drive |
+| [Mission Progress](MissionProgress) | Shows your mission progress and total game completion, following the Borderlands mission flow |
+| [Movement Speed Changer](MovementSpeedChanger) | Sets how fast you walk, run, aim, crouch and drive |
 | [No Backpack Limit](NoBackpackLimit) | Sets how many things your backpack holds |
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
 | [No Reload](NoReload) | Your magazine never runs down |

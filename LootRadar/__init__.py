@@ -126,14 +126,14 @@ def card_dps(weapon: UObject) -> float | None:
     loot on the ground has none.
     """
     try:
-        import WeaponScore  # type: ignore
+        import GearScore  # type: ignore
     except Exception:
         return None
 
     try:
-        if WeaponScore.DisregardAccuracy.value is not True:
+        if GearScore.DisregardAccuracy.value is not True:
             return None
-        return WeaponScore.get_dps(None, "", weapon)
+        return GearScore.get_dps(None, "", weapon)
     except Exception:
         return None
 

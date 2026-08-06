@@ -11,7 +11,7 @@ name = "Teleport"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
-auto_enable = "True"
+auto_enable = true
 
 download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/Teleport/Teleport.sdkmod"
 license = {name = "GPL-3.0-or-later", url = "https://www.gnu.org/licenses/gpl-3.0.en.html" }

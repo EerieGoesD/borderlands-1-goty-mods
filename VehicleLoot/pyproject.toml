@@ -4,7 +4,7 @@ version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Picks loot up while you are driving.
 
-For full information about this mod and to report bugs, please visit: eeriegoesd.com/gaming/mods"""
+For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
 [tool.sdkmod]
 name = "Vehicle Loot"
@@ -13,4 +13,4 @@ supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = "True"
 download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/VehicleLoot/VehicleLoot.sdkmod"
-license = {name = "All rights reserved" }
+license = {name = "GPL-3.0-or-later" }

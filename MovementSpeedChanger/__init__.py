@@ -162,7 +162,7 @@ build_mod(
     keybinds=[],
     hooks=[on_render],
     commands=[],
-    settings_file=Path(f"{SETTINGS_DIR}/MoveSpeed.json"),
+    settings_file=Path(f"{SETTINGS_DIR}/MovementSpeedChanger.json"),
 )
 
 logging.info(f"Move Speed Loaded: {__version__}, {__version_info__}")

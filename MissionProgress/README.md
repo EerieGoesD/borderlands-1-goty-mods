@@ -1,6 +1,7 @@
 # Mission Progress
 
-Shows your mission progress and total game completion.
+Shows your mission progress and total game completion, following the Borderlands
+mission flow.
 
 ## What each line means
 

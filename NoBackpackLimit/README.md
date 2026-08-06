@@ -1,10 +1,10 @@
 # No Backpack Limit
 
-Sets how many things your backpack holds.
+Sets the backpack capacity limit.
 
 ## Settings
 
-- **Backpack slots**: how many things you can carry. The game's own number is 15.
+- **Backpack slots**: the backpack capacity limit. The game's own number is 15.
 
 ## Install
 

@@ -6,6 +6,9 @@ description = """Marks loot and unopened chests on your compass, with the distan
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
+[project.urls]
+"Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
+
 [tool.sdkmod]
 name = "Loot Radar"
 mod_type = "Standard"

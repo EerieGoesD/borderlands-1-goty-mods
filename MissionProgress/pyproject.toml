@@ -6,6 +6,9 @@ description = """Shows your mission progress and total game completion, followin
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
+[project.urls]
+"Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
+
 [tool.sdkmod]
 name = "Mission Progress"
 mod_type = "Standard"

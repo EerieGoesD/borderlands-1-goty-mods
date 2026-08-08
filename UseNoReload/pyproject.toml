@@ -6,6 +6,9 @@ description = """Stops the "E" (Use) key from reloading your gun.
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
+[project.urls]
+"Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
+
 [tool.sdkmod]
 name = "Use No Reload"
 mod_type = "Standard"

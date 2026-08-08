@@ -6,6 +6,9 @@ description = """Keeps a running note of what every mod is doing, so after a cra
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
+[project.urls]
+"Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
+
 [tool.sdkmod]
 name = "Crash Debug"
 mod_type = "Standard"

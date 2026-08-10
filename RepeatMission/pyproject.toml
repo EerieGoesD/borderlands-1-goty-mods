@@ -1,6 +1,6 @@
 [project]
 name = "RepeatMission"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Lets you repeat any mission you have already completed, or set it ready to turn in.
 

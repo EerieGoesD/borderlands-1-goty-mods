@@ -2,8 +2,10 @@ from pathlib import Path
 
 import unrealsdk  # type: ignore
 from unrealsdk import logging  # type: ignore
+from unrealsdk.hooks import Type  # type: ignore
+from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc
+from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import ButtonOption, DropdownOption
 
 # 4 is finished, 2 is done and waiting to be handed in, 1 is under way.
@@ -211,6 +213,22 @@ Repeat = ButtonOption("Repeat Selected Mission", on_press=on_repeat)
 Ready = ButtonOption("Ready to Turn In", on_press=on_ready)
 Complete = ButtonOption("Mark Complete", on_press=on_complete)
 Refresh = ButtonOption("Refresh the List", on_press=on_refresh)
+
+
+@hook(
+    hook_func="WillowGame.WillowGFxMenuScreenGeneric:Screen_Activate",
+    hook_type=Type.PRE,
+    immediately_enable=True,
+)
+def on_menu_screen(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The list is filled in just before a menu screen is drawn, so it is ready the
+    first time you open the mod's settings rather than the second."""
+    on_refresh(Refresh)
 
 
 def on_enable() -> None:

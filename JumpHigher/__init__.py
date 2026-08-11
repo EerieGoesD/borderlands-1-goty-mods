@@ -20,7 +20,7 @@ READING_TOP = 120
 # What the game calls being off the ground.
 IN_THE_AIR = 2
 
-JumpHeight = SliderOption(f"Jump Height (default = {STOCK_JUMP})", STOCK_JUMP, 200, 4000, 10, True)
+JumpHeight = SliderOption(f"Jump Height (default = {STOCK_JUMP})", STOCK_JUMP, 200, 10000, 10, True)
 ShowJump = BoolOption("Show jump height [DEBUG]", False, "Yes", "No")
 
 font = None

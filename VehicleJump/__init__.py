@@ -20,6 +20,27 @@ READING_TOP = 120
 JumpHeight = SliderOption("Jump Height", 800, 200, 10000, 10, True)
 ShowJump = BoolOption("Show jump height [DEBUG]", False, "Yes", "No")
 
+# Push squared per unit of height. The starting number is only a first guess; every
+# jump measures the real one and corrects it.
+push_per_height = 5920.0
+
+
+def push_for(height: float) -> float:
+    """The push that gets the car that many units off the ground."""
+    return (height * push_per_height) ** 0.5
+
+
+def learn(asked: float, got: float) -> None:
+    """Corrects the guess from a jump that has just finished."""
+    global push_per_height
+
+    if asked <= 0 or got <= 1:
+        return
+
+    # A single odd reading should not throw the whole thing off.
+    change = min(2.0, max(0.5, asked / got))
+    push_per_height = min(50000.0, max(1.0, push_per_height * change))
+
 font = None
 white = None
 
@@ -30,6 +51,9 @@ last_jump = 0.0
 
 # The car's own top speed, kept so it can be put back after a jump.
 stock_top_speed = None
+
+# True once the wheels have actually left the ground on this jump.
+in_the_air = False
 
 
 def in_a_vehicle(pawn) -> bool:
@@ -42,7 +66,7 @@ def in_a_vehicle(pawn) -> bool:
 @keybind("Vehicle Jump", "SpaceBar")
 def on_jump() -> None:
     """Throws the vehicle upwards."""
-    global took_off, peak
+    global took_off, peak, in_the_air
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -51,7 +75,16 @@ def on_jump() -> None:
     if not in_a_vehicle(pc.Pawn):
         return
 
-    push = float(JumpHeight.value)
+    # One jump at a time, so holding the key does not stack pushes.
+    if took_off is not None:
+        return
+    try:
+        if not bool(pc.Pawn.bVehicleOnGround):
+            return
+    except Exception:
+        pass
+
+    push = push_for(float(JumpHeight.value))
 
     # A car is a physics body, so its own Velocity field is not what moves it.
     try:
@@ -64,14 +97,14 @@ def on_jump() -> None:
         global stock_top_speed
         if stock_top_speed is None:
             stock_top_speed = float(pc.Pawn.MaxSpeed)
-        if float(pc.Pawn.MaxSpeed) < push * 2.0:
-            pc.Pawn.MaxSpeed = push * 2.0
+        pc.Pawn.MaxSpeed = 1000000.0
 
         up = unrealsdk.make_struct("Vector", X=0.0, Y=0.0, Z=push)
         here = unrealsdk.make_struct("Vector", X=0.0, Y=0.0, Z=0.0)
         mesh.AddImpulse(up, here, "", True)
         took_off = float(pc.Pawn.Location.Z)
         peak = took_off
+        in_the_air = False
     except Exception as ex:
         logging.dev_warning(f"[Vehicle Jump] could not jump ({ex})")
 
@@ -84,7 +117,7 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Watches the jump, puts the car's top speed back, and writes the reading."""
-    global font, white, took_off, peak, last_jump, stock_top_speed
+    global font, white, took_off, peak, last_jump, stock_top_speed, in_the_air
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or not in_a_vehicle(pc.Pawn):
@@ -96,9 +129,21 @@ def on_render(
         if took_off is not None:
             if height > peak:
                 peak = height
-            elif height <= took_off + 1.0:
+
+            on_ground = False
+            try:
+                on_ground = bool(pc.Pawn.bVehicleOnGround)
+            except Exception:
+                on_ground = height <= took_off + 1.0
+
+            if not on_ground:
+                in_the_air = True
+
+            if in_the_air and on_ground:
                 last_jump = peak - took_off
                 took_off = None
+                in_the_air = False
+                learn(float(JumpHeight.value), last_jump)
                 if stock_top_speed is not None:
                     pc.Pawn.MaxSpeed = stock_top_speed
                     stock_top_speed = None
@@ -124,13 +169,22 @@ def on_render(
         canvas.DrawColor = white
         canvas.SetPos(READING_LEFT, READING_TOP)
         canvas.DrawText(
-            f"jump {now:.0f}   strength {float(JumpHeight.value):.0f}",
+            f"jump {now:.0f}   set to {float(JumpHeight.value):.0f}",
             False,
             1.0,
             1.0,
         )
     except Exception as ex:
         logging.dev_warning(f"[Vehicle Jump] could not draw the jump ({ex})")
+
+
+def on_enable() -> None:
+    """Starts fresh, so an odd jump earlier cannot follow you around."""
+    global took_off, push_per_height, in_the_air
+
+    took_off = None
+    in_the_air = False
+    push_per_height = 5920.0
 
 
 def on_disable() -> None:
@@ -160,6 +214,7 @@ build_mod(
     keybinds=[on_jump],
     hooks=[on_render],
     commands=[],
+    on_enable=on_enable,
     on_disable=on_disable,
     settings_file=Path(f"{SETTINGS_DIR}/VehicleJump.json"),
 )

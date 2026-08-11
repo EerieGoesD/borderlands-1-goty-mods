@@ -1,8 +1,8 @@
 [project]
-name = "JumpHigher"
-version = "1.0.1"
+name = "InfiniteMoney"
+version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Lets you jump higher than the game allows.
+description = """Sets how much money you carry.
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
@@ -10,11 +10,10 @@ For full information about this mod and to report bugs, please visit: https://ee
 "Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
 
 [tool.sdkmod]
-name = "Jump Higher"
+name = "Infinite Money"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = true
-
-download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/JumpHigher/JumpHigher.sdkmod"
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/InfiniteMoney/InfiniteMoney.sdkmod"
 license = {name = "GPL-3.0-or-later", url = "https://www.gnu.org/licenses/gpl-3.0.en.html" }

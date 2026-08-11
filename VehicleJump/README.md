@@ -6,7 +6,7 @@ Space throws the vehicle upwards. You can change the key in the mod settings.
 
 ## Settings
 
-- **Jump Height**: how hard the vehicle pushes off the ground.
+- **Jump Height**: how far off the ground the vehicle goes, up to 10000.
 - **Show jump height [DEBUG]**: prints how high the last jump went.
 
 ## Install

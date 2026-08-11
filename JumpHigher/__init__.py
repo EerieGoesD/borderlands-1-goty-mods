@@ -29,7 +29,7 @@ def learn(asked: float, got: float) -> None:
         return
 
     # A single odd reading should not throw the whole thing off.
-    change = min(4.0, max(0.25, asked / got))
+    change = min(100.0, max(0.01, asked / got))
     push_per_height = min(50000.0, max(1.0, push_per_height * change))
 
 
@@ -138,10 +138,9 @@ def on_render(
 
 
 def on_enable() -> None:
-    """Starts the measuring from scratch."""
-    global push_per_height, took_off
+    """Starts a fresh jump, keeping what has already been measured."""
+    global took_off
 
-    push_per_height = 2000.0
     took_off = None
 
 

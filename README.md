@@ -11,6 +11,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Infinite Ammo](InfiniteAmmo) | Unlimited ammo. No reload option |
 | [Infinite Health](InfiniteHealth) | God-mode basically |
+| [Infinite Money](InfiniteMoney) | Sets how much money you carry |
 | [Jump Higher](JumpHigher) | Lets you jump higher than the game allows |
 | [Loot Radar](LootRadar) | Marks loot and unopened chests on your compass, with the distance to each one |
 | [Mission Progress](MissionProgress) | Shows your mission progress and total game completion, following the Borderlands mission flow |
@@ -26,6 +27,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Sell Value](SellValue) | Shows what an item sells for on its card |
 | [Teleport](Teleport) | Takes you to any place you have already been to in this playthrough |
 | [Use No Reload](UseNoReload) | Stops the Use key reloading your gun |
+| [Vehicle Jump](VehicleJump) | Lets you jump while driving |
 | [Vehicle Loot](VehicleLoot) | Picks loot up while you drive |
 
 ## Install

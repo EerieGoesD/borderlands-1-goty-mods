@@ -51,9 +51,28 @@ last_jump = 0.0
 # True while you are being carried up to the height you asked for.
 lifting = False
 
+# True once you have pressed jump, so being knocked off the ground by a shot does not
+# send you up.
+jumped = False
+
 # The height last seen while lifting, and how long it has not changed.
 last_height = 0.0
 stuck = 0
+
+
+@hook(hook_func="Engine.Pawn:DoJump", hook_type=Type.PRE)
+def on_do_jump(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """Notes that this jump is one you asked for."""
+    global jumped
+
+    pc = get_pc()
+    if pc is not None and pc.Pawn is not None and obj == pc.Pawn:
+        jumped = True
 
 
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
@@ -65,7 +84,7 @@ def on_render(
 ) -> None:
     """Carries you up to whatever height the slider says."""
     global font, white, ground, took_off, peak, last_jump
-    global lifting, last_height, stuck
+    global lifting, last_height, stuck, jumped
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -89,14 +108,16 @@ def on_render(
                 took_off = None
             lifting = False
             stuck = 0
+            jumped = False
         else:
             if took_off is None:
                 took_off = ground
                 peak = height
                 last_height = height
                 stuck = 0
-                # A jump no bigger than the game's own is left alone.
-                lifting = target > STOCK_HEIGHT
+                # A jump no bigger than the game's own, or a shot knocking you off
+                # the ground, is left alone.
+                lifting = jumped and target > STOCK_HEIGHT
 
             if height > peak:
                 peak = height
@@ -152,11 +173,12 @@ def on_render(
 
 def on_enable() -> None:
     """Starts a fresh jump."""
-    global took_off, lifting, stuck
+    global took_off, lifting, stuck, jumped
 
     took_off = None
     lifting = False
     stuck = 0
+    jumped = False
 
 
 def on_disable() -> None:
@@ -185,7 +207,7 @@ build_mod(
     options=[JumpHeight, ShowJump],
     on_enable=on_enable,
     keybinds=[],
-    hooks=[on_render],
+    hooks=[on_render, on_do_jump],
     commands=[],
     on_disable=on_disable,
     settings_file=Path(f"{SETTINGS_DIR}/JumpHigher.json"),

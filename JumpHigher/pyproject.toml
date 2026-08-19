@@ -1,6 +1,6 @@
 [project]
 name = "JumpHigher"
-version = "1.2.0"
+version = "1.2.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Lets you jump higher than the game allows.
 

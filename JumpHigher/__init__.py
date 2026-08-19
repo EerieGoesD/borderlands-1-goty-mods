@@ -11,27 +11,21 @@ from mods_base.options import BoolOption, SliderOption
 # The push the game gives you out of the box.
 STOCK_JUMP = 630
 
-# Push squared per unit of height. The starting number is only a first guess; every
-# jump measures the real one and corrects it.
-push_per_height = 2000.0
+# How high that push gets you, in units.
+STOCK_HEIGHT = 240
 
+# How fast you are carried upwards, in units per second. Kept well under what the game
+# is happy with, so none of its own limits get in the way.
+CLIMB_SPEED = 2500.0
 
-def push_for(height: float) -> float:
-    """The push that gets you that many units off the ground."""
-    return (height * push_per_height) ** 0.5
+# How sharply the climb eases off near the top, so you stop at the height you asked for.
+EASE = 4.0
 
+# How far below the top we let go, in units.
+LET_GO = 25.0
 
-def learn(asked: float, got: float) -> None:
-    """Corrects the guess from a jump that has just finished."""
-    global push_per_height
-
-    if asked <= 0 or got <= 1:
-        return
-
-    # A single odd reading should not throw the whole thing off.
-    change = min(100.0, max(0.01, asked / got))
-    push_per_height = min(50000.0, max(1.0, push_per_height * change))
-
+# How many frames of no height gained before the push stops, for when you hit a roof.
+STUCK_FRAMES = 15
 
 FONT = "ui_fonts.font_willowbody_18pt"
 
@@ -42,19 +36,24 @@ READING_TOP = 120
 # What the game calls being off the ground.
 IN_THE_AIR = 2
 
-JumpHeight = SliderOption("Jump Height", 190, 10, 10000, 10, True)
+JumpHeight = SliderOption("Jump Height", 240, 240, 10000, 10, True)
 ShowJump = BoolOption("Show jump height [DEBUG]", False, "Yes", "No")
 
 font = None
 white = None
 
 # Where you left the ground, and the highest you got, so the jump can be measured.
+ground = 0.0
 took_off = None
 peak = 0.0
 last_jump = 0.0
 
-# The area's own speed limit, kept so it can be put back.
-stock_top_speed = None
+# True while you are being carried up to the height you asked for.
+lifting = False
+
+# The height last seen while lifting, and how long it has not changed.
+last_height = 0.0
+stuck = 0
 
 
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
@@ -64,50 +63,64 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Holds your jump at whatever the slider says."""
-    global font, white, took_off, peak, last_jump
+    """Carries you up to whatever height the slider says."""
+    global font, white, ground, took_off, peak, last_jump
+    global lifting, last_height, stuck
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return
 
-    global stock_top_speed
-
     try:
-        wanted = push_for(float(JumpHeight.value))
-        if abs(float(pc.Pawn.JumpZBaseValue) - wanted) > 0.5:
-            pc.Pawn.JumpZBaseValue = wanted
-        if abs(float(pc.Pawn.JumpZ) - wanted) > 0.5:
-            pc.Pawn.JumpZ = wanted
+        pawn = pc.Pawn
+        height = float(pawn.Location.Z)
+        target = float(JumpHeight.value)
+        in_air = int(pawn.Physics) == IN_THE_AIR
 
-        # The area's own speed limit cuts the jump short, so it is lifted out of the
-        # way while the mod is on and put back when it is turned off.
-        volume = pc.Pawn.PhysicsVolume
-        if volume is not None:
-            room = wanted * 2.0
-            if float(volume.TerminalVelocity) < room:
-                if stock_top_speed is None:
-                    stock_top_speed = (volume, float(volume.TerminalVelocity))
-                volume.TerminalVelocity = room
+        if not in_air:
+            ground = height
+            # The jump itself stays the one the game came with.
+            if float(pawn.JumpZBaseValue) != float(STOCK_JUMP):
+                pawn.JumpZBaseValue = float(STOCK_JUMP)
+            if float(pawn.JumpZ) != float(STOCK_JUMP):
+                pawn.JumpZ = float(STOCK_JUMP)
+            if took_off is not None:
+                last_jump = peak - took_off
+                took_off = None
+            lifting = False
+            stuck = 0
+        else:
+            if took_off is None:
+                took_off = ground
+                peak = height
+                last_height = height
+                stuck = 0
+                # A jump no bigger than the game's own is left alone.
+                lifting = target > STOCK_HEIGHT
+
+            if height > peak:
+                peak = height
+
+            if lifting:
+                remaining = target - (height - took_off)
+
+                # A roof, or anything else in the way, stops the push.
+                if height <= last_height + 0.5:
+                    stuck += 1
+                else:
+                    stuck = 0
+                last_height = height
+
+                if remaining <= LET_GO or stuck > STUCK_FRAMES:
+                    lifting = False
+                else:
+                    speed = min(CLIMB_SPEED, remaining * EASE)
+                    velocity = pawn.Velocity
+                    if abs(float(velocity.Z) - speed) > 1.0:
+                        velocity.Z = speed
+                        pawn.Velocity = velocity
     except Exception as ex:
         logging.dev_warning(f"[Jump Higher] could not set the jump ({ex})")
-
-    # Every jump is measured, so the height on the slider is the height you get.
-    try:
-        height = float(pc.Pawn.Location.Z)
-
-        if int(pc.Pawn.Physics) == IN_THE_AIR:
-            if took_off is None:
-                took_off = height
-                peak = height
-            elif height > peak:
-                peak = height
-        elif took_off is not None:
-            last_jump = peak - took_off
-            took_off = None
-            learn(float(JumpHeight.value), last_jump)
-    except Exception as ex:
-        logging.dev_warning(f"[Jump Higher] could not measure the jump ({ex})")
         return
 
     if ShowJump.value is False:
@@ -138,25 +151,20 @@ def on_render(
 
 
 def on_enable() -> None:
-    """Starts a fresh jump, keeping what has already been measured."""
-    global took_off
+    """Starts a fresh jump."""
+    global took_off, lifting, stuck
 
     took_off = None
+    lifting = False
+    stuck = 0
 
 
 def on_disable() -> None:
     """Back to the jump the game came with."""
-    global took_off, stock_top_speed
+    global took_off, lifting
 
     took_off = None
-
-    if stock_top_speed is not None:
-        volume, was = stock_top_speed
-        try:
-            volume.TerminalVelocity = was
-        except Exception:
-            pass
-        stock_top_speed = None
+    lifting = False
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:

@@ -17,7 +17,7 @@ FEET_PER_METRE = 3.28084
 TEXT_SCALE = 0.6
 
 # Frames between sweeps of the area.
-REFRESH_FRAMES = 30
+REFRESH_FRAMES = 60
 
 # How often we check whether a shop screen is up, in frames.
 SHOP_FRAMES = 10
@@ -413,8 +413,8 @@ def on_spawn_particles(
     return Block
 
 
-# The chests in the area, looked up now and then rather than every sweep.
-CHESTS_EVERY = 120
+# The chests in the area, looked up once per sweep.
+CHESTS_EVERY = 1
 chest_list: list[tuple[UObject, str]] = []
 chest_frames = CHESTS_EVERY
 

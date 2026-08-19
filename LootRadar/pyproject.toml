@@ -1,6 +1,6 @@
 [project]
 name = "LootRadar"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Marks loot and unopened chests on your compass, with the distance to each one.
 

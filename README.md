@@ -21,6 +21,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [No Reload](NoReload) | Your magazine never runs down |
 | [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |
 | [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |
+| [Random Vehicle Colour](RandomVehicleColour) | Gives every vehicle you spawn a random paint job |
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
 | [Reset Chests](ResetChests) | Shuts every red and white chest you have opened in this area |
 | [Run And Walk](RunAndWalk) | Makes running and walking work off a hold key and a toggle key |

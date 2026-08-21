@@ -19,6 +19,8 @@ painting = False
 waiting = None
 waited = 0
 SETTLING = 20
+REPEAT_EVERY = 10
+GIVE_UP = 120
 
 # The colour picked when the terminal opened, or nothing if you have picked your own.
 chosen = None
@@ -53,17 +55,8 @@ def move_the_tick(spot: int) -> None:
             logging.dev_warning(f"[Random Vehicle Colour] could not move the tick ({ex})")
 
 
-@hook(
-    hook_func="WillowGame.WillowPlayerController:StartUsingVehicleSpawnStationTerminal",
-    hook_type=Type.POST,
-)
-def on_open(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    """Picks the colour as you walk up to the terminal, so you can see it first."""
+def opened() -> None:
+    """Picks the colour as the terminal opens, so you can see it first."""
     global chosen, waiting, waited, since_opened
 
     chosen = None
@@ -82,6 +75,31 @@ def on_open(
         waited = 0
     except Exception as ex:
         logging.dev_warning(f"[Random Vehicle Colour] could not pick a colour ({ex})")
+
+
+@hook(
+    hook_func="WillowGame.WillowPlayerController:StartUsingVehicleSpawnStationTerminal",
+    hook_type=Type.POST,
+)
+def on_walk_up(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The way GOTY opens the terminal."""
+    opened()
+
+
+@hook(hook_func="WillowGame.VehicleSpawnStationGFxMovie:Start", hook_type=Type.POST)
+def on_menu_up(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """The way GOTY Enhanced opens the terminal."""
+    opened()
 
 
 @hook(
@@ -121,9 +139,14 @@ def on_render(
     if waited < SETTLING:
         return
 
-    spot = waiting
-    waiting = None
-    move_the_tick(spot)
+    # The menu redraws itself for a while after it opens, so the tick is put back
+    # every so often until it stays put.
+    if waited > GIVE_UP:
+        waiting = None
+        return
+
+    if waited % REPEAT_EVERY == 0:
+        move_the_tick(waiting)
 
 
 @hook(hook_func="WillowGame.WillowVehicle:SetVehicleMaterial", hook_type=Type.PRE)
@@ -183,7 +206,7 @@ __version_info__: tuple[int, ...]
 build_mod(
     options=[PickOnOpen],
     keybinds=[],
-    hooks=[on_open, on_your_pick, on_render, on_paint],
+    hooks=[on_walk_up, on_menu_up, on_your_pick, on_render, on_paint],
     commands=[],
     settings_file=Path(f"{SETTINGS_DIR}/RandomVehicleColour.json"),
 )

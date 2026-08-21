@@ -1,5 +1,5 @@
 from pathlib import Path
-from random import choice
+from random import choice, randrange
 
 import unrealsdk  # type: ignore
 from unrealsdk import logging  # type: ignore
@@ -9,13 +9,23 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, hook
 from mods_base.options import BoolOption
 
-ShowPaint = BoolOption("Show the paint picked [DEBUG]", False, "Yes", "No")
+PickOnOpen = BoolOption("Pick at the terminal", False, "Yes", "No")
 
 # True while we are doing the painting ourselves, so we do not call it forever.
 painting = False
 
-# The colour the tick still needs moving to, once the game is back to drawing.
+# The colour the tick still needs moving to, and how long it has been waiting. The
+# menu builds itself over a few frames, so moving the tick straight away is undone.
 waiting = None
+waited = 0
+SETTLING = 20
+
+# The colour picked when the terminal opened, or nothing if you have picked your own.
+chosen = None
+
+# Frames since the terminal opened, so your own click can be told apart from the
+# menu setting itself up.
+since_opened = 0
 
 
 def colours() -> list:
@@ -30,13 +40,8 @@ def colours() -> list:
     return []
 
 
-def move_the_tick() -> None:
-    """Puts the terminal's tick on the colour the car came out in."""
-    global waiting
-
-    spot = waiting
-    waiting = None
-
+def move_the_tick(spot: int) -> None:
+    """Puts the terminal's tick on the colour we picked."""
     for menu in unrealsdk.find_all("VehicleSpawnStationGFxMovie"):
         if str(menu.Name).startswith("Default__"):
             continue
@@ -48,6 +53,54 @@ def move_the_tick() -> None:
             logging.dev_warning(f"[Random Vehicle Colour] could not move the tick ({ex})")
 
 
+@hook(
+    hook_func="WillowGame.WillowPlayerController:StartUsingVehicleSpawnStationTerminal",
+    hook_type=Type.POST,
+)
+def on_open(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """Picks the colour as you walk up to the terminal, so you can see it first."""
+    global chosen, waiting, waited, since_opened
+
+    chosen = None
+    since_opened = 0
+
+    if PickOnOpen.value is not True:
+        return
+
+    try:
+        bank = colours()
+        if not bank:
+            return
+
+        chosen = randrange(len(bank))
+        waiting = chosen
+        waited = 0
+    except Exception as ex:
+        logging.dev_warning(f"[Random Vehicle Colour] could not pick a colour ({ex})")
+
+
+@hook(
+    hook_func="WillowGame.VehicleSpawnStationGFxMovie:extSetPrimaryColorIndex",
+    hook_type=Type.POST,
+)
+def on_your_pick(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    """Your own click on a swatch wins over the one we offered."""
+    global chosen
+
+    if chosen is not None and since_opened > SETTLING:
+        chosen = None
+
+
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
 def on_render(
     obj: UObject,
@@ -55,9 +108,22 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Moves the tick a frame after the car came out, not during the spawn itself."""
-    if waiting is not None:
-        move_the_tick()
+    """Moves the tick once the menu has had time to finish drawing itself."""
+    global waiting, waited, since_opened
+
+    if since_opened <= SETTLING:
+        since_opened += 1
+
+    if waiting is None:
+        return
+
+    waited += 1
+    if waited < SETTLING:
+        return
+
+    spot = waiting
+    waiting = None
+    move_the_tick(spot)
 
 
 @hook(hook_func="WillowGame.WillowVehicle:SetVehicleMaterial", hook_type=Type.PRE)
@@ -67,8 +133,8 @@ def on_paint(
     __ret: any,
     func: BoundFunction,
 ):
-    """Paints the car that just came out of the Catch-a-Ride at random."""
-    global painting, waiting
+    """Paints the car coming out of the Catch-a-Ride."""
+    global painting, waiting, waited
 
     if painting:
         return None
@@ -78,13 +144,19 @@ def on_paint(
         if not bank:
             return None
 
-        # The one the game picked is left out, so the car always looks different.
-        was = str(args.MatInst)
-        spots = [i for i, c in enumerate(bank) if str(c.Material) != was]
-        if not spots:
-            return None
+        if PickOnOpen.value is True:
+            # You have picked your own since we offered one, so leave it alone.
+            if chosen is None:
+                return None
+            spot = chosen
+        else:
+            # The one the game picked is left out, so the car always looks different.
+            was = str(args.MatInst)
+            spots = [i for i, c in enumerate(bank) if str(c.Material) != was]
+            if not spots:
+                return None
+            spot = choice(spots)
 
-        spot = choice(spots)
         pick = bank[spot].Material
 
         painting = True
@@ -93,10 +165,9 @@ def on_paint(
         finally:
             painting = False
 
-        waiting = spot
-
-        if ShowPaint.value is True:
-            logging.info(f"[Random Vehicle Colour] painted it {bank[spot].MaterialName}")
+        if PickOnOpen.value is not True:
+            waiting = spot
+            waited = SETTLING - 1
 
         return Block
     except Exception as ex:
@@ -110,9 +181,9 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[ShowPaint],
+    options=[PickOnOpen],
     keybinds=[],
-    hooks=[on_paint, on_render],
+    hooks=[on_open, on_your_pick, on_render, on_paint],
     commands=[],
     settings_file=Path(f"{SETTINGS_DIR}/RandomVehicleColour.json"),
 )

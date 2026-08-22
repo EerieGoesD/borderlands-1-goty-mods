@@ -2,7 +2,8 @@
 
 Lets you fly through walls.
 
-Press Z to lift off and fly through everything. Press it again to drop back on your feet.
+Press Z to lift off and fly through everything. Hold Space to go straight up. Press Z
+again to drop back on your feet.
 
 ## Settings
 

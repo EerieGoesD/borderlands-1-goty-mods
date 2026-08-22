@@ -424,6 +424,13 @@ CHESTS_EVERY = 1
 chest_list: list[tuple[UObject, str]] = []
 chest_frames = CHESTS_EVERY
 
+# The pickups still waiting to be looked at, and the marks being built up.
+waiting_on: list = []
+waiting_marks: list = []
+
+# How many pickups are looked at each frame.
+BATCH = 8
+
 # What each pickup turned out to be, so its name is only read once.
 kinds: dict[UObject, str] = {}
 
@@ -473,12 +480,6 @@ def find_chests() -> list[tuple[tuple[float, float, float], str]]:
     return found
 
 
-# How often the full pickups are looked at, in frames. The same as the standalone
-# Hide Full Pickups mod, so the two behave the same.
-HIDE_FRAMES = 5
-hide_frames = 0
-
-
 def usable_now(pickup: UObject) -> bool:
     """Whether you could pick this up right now, asked the way the game asks it."""
     pc = get_pc()
@@ -489,44 +490,6 @@ def usable_now(pickup: UObject) -> bool:
         return pickup.Inventory.CanBeUsedBy(pc.Pawn) is True
     except Exception:
         return True
-
-
-def hide_the_full() -> None:
-    """Keeps the beam and the FULL badge off anything you cannot carry."""
-    pc = get_pc()
-    if pc is None or pc.Pawn is None:
-        return
-
-    hud = pc.myHUD
-
-    for pickup in unrealsdk.find_all("WillowPickup"):
-        try:
-            if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
-                hidden.discard(pickup)
-                continue
-            if pickup.Inventory is None:
-                continue
-            usable = usable_now(pickup)
-        except Exception:
-            continue
-
-        if usable:
-            if pickup in hidden:
-                hidden.discard(pickup)
-                try:
-                    if hud is not None:
-                        hud.AddPostRenderedActor(pickup)
-                    pickup.SpawnPickupParticles()
-                except Exception:
-                    pass
-        elif pickup not in hidden:
-            hidden.add(pickup)
-            try:
-                if hud is not None:
-                    hud.RemovePostRenderedActor(pickup)
-                pickup.DestroyPickupParticles()
-            except Exception:
-                pass
 
 
 def sweep() -> None:
@@ -563,7 +526,7 @@ def sweep() -> None:
         marks = []
         return
 
-    marks = find_chests()
+    found = find_chests()
 
     global carried
     carried = worst_carried() if BetterOnly.value is True else {}
@@ -581,7 +544,17 @@ def sweep() -> None:
     except Exception:
         on_screen = None
 
-    for pickup in unrealsdk.find_all("WillowPickup"):
+    # The pickups are handled a handful at a time, spread over the frames until the
+    # next sweep, so the game is not held up all at once.
+    global waiting_on, waiting_marks
+    waiting_on = list(unrealsdk.find_all("WillowPickup"))
+    waiting_marks = found
+    marks = found
+
+
+def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
+    """Looks at a few pickups, hiding what you cannot carry and marking the rest."""
+    for pickup in batch:
         try:
             if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
                 hidden.discard(pickup)
@@ -590,12 +563,13 @@ def sweep() -> None:
                 continue
 
             takeable = can_take(pickup, pawn)
+            carryable = usable_now(pickup)
         except Exception:
             continue
 
         # Full ammo drops out, and so does a gun no better than the one you carry.
         better = worth_taking(pickup)
-        show = takeable and better
+        show = carryable and better
         if HideFull.value is False:
             show = better
 
@@ -633,7 +607,7 @@ def sweep() -> None:
         if wanted(kind):
             try:
                 spot = pickup.Location
-                marks.append(
+                waiting_marks.append(
                     ((float(spot.X), float(spot.Y), float(spot.Z)), kind),
                 )
             except Exception:
@@ -658,7 +632,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, gear, black, shop_open, shop_frames, hide_frames
+    global frames, gear, black, shop_open, shop_frames, marks
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or pc.myHUD is None:
@@ -672,12 +646,21 @@ def on_render(
     if frames >= REFRESH_FRAMES:
         frames = 0
         sweep()
+    elif waiting_on:
+        batch = waiting_on[:BATCH]
+        del waiting_on[:BATCH]
 
-    if HideFull.value is True:
-        hide_frames += 1
-        if hide_frames >= HIDE_FRAMES:
-            hide_frames = 0
-            hide_the_full()
+        pawn = getattr(pc.Pawn, "Driver", None) or pc.Pawn
+        hiding = HideFull.value is True or BetterOnly.value is True
+        hud = pc.myHUD
+        try:
+            on_screen = set(hud.PostRenderedActors) if hud is not None else set()
+        except Exception:
+            on_screen = None
+
+        step_through(pawn, hud, on_screen, hiding, batch)
+        if not waiting_on:
+            marks = waiting_marks
 
     if not marks:
         return

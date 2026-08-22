@@ -6,7 +6,7 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc, hook, keybind
+from mods_base import SETTINGS_DIR, EInputEvent, build_mod, get_pc, hook, keybind
 from mods_base.options import SliderOption
 
 # What the game calls walking about and flying through everything.
@@ -27,6 +27,9 @@ FlySpeed = SliderOption("Fly Speed", 2000, 200, 10000, 100, True)
 
 # True from the moment you press the key until you press it again.
 flying = False
+
+# True while you are holding the rise key.
+rising = False
 
 # Your own speed in the air, so it can be put back.
 stock_speed = None
@@ -95,6 +98,14 @@ def on_toggle() -> None:
         logging.dev_warning(f"[No Clip] could not switch ({ex})")
 
 
+@keybind("Fly Up", "SpaceBar", event_filter=None)
+def on_rise(event: EInputEvent) -> None:
+    """Held down while flying, it takes you straight up."""
+    global rising
+
+    rising = event != EInputEvent.IE_Released
+
+
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
 def on_render(
     obj: UObject,
@@ -133,6 +144,15 @@ def on_render(
             still.Y = 0.0
             still.Z = 0.0
             pawn.Velocity = still
+
+            if rising:
+                spot = pawn.Location
+                pawn.Location = unrealsdk.make_struct(
+                    "Vector",
+                    X=float(spot.X),
+                    Y=float(spot.Y),
+                    Z=float(spot.Z) + float(FlySpeed.value) / FRAMES_A_SECOND,
+                )
 
             if pressing:
                 look = pc.Rotation
@@ -196,7 +216,7 @@ def on_render(
 
 def on_disable() -> None:
     """Puts you back on your feet if the mod is turned off mid-flight."""
-    global flying, stock_speed, took_off_at, falling
+    global flying, rising, stock_speed, took_off_at, falling
 
     if flying:
         pc = get_pc()
@@ -207,6 +227,7 @@ def on_disable() -> None:
                 logging.dev_warning(f"[No Clip] could not put you back ({ex})")
 
     flying = False
+    rising = False
     stock_speed = None
     took_off_at = None
     falling = 0
@@ -218,7 +239,7 @@ __version_info__: tuple[int, ...]
 
 build_mod(
     options=[FlySpeed],
-    keybinds=[on_toggle],
+    keybinds=[on_toggle, on_rise],
     hooks=[on_render],
     commands=[],
     on_disable=on_disable,

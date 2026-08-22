@@ -167,6 +167,12 @@ def on_paint(
         if not bank:
             return None
 
+        # Anything wearing a colour the Catch-a-Ride does not offer is another
+        # kind of vehicle, and painting it wrecks its look.
+        was = str(args.MatInst)
+        if was not in [str(c.Material) for c in bank]:
+            return None
+
         if PickOnOpen.value is True:
             # You have picked your own since we offered one, so leave it alone.
             if chosen is None:
@@ -174,7 +180,6 @@ def on_paint(
             spot = chosen
         else:
             # The one the game picked is left out, so the car always looks different.
-            was = str(args.MatInst)
             spots = [i for i, c in enumerate(bank) if str(c.Material) != was]
             if not spots:
                 return None

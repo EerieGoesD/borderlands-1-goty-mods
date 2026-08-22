@@ -473,6 +473,62 @@ def find_chests() -> list[tuple[tuple[float, float, float], str]]:
     return found
 
 
+# How often the full pickups are looked at, in frames. The same as the standalone
+# Hide Full Pickups mod, so the two behave the same.
+HIDE_FRAMES = 5
+hide_frames = 0
+
+
+def usable_now(pickup: UObject) -> bool:
+    """Whether you could pick this up right now, asked the way the game asks it."""
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        return True
+
+    try:
+        return pickup.Inventory.CanBeUsedBy(pc.Pawn) is True
+    except Exception:
+        return True
+
+
+def hide_the_full() -> None:
+    """Keeps the beam and the FULL badge off anything you cannot carry."""
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        return
+
+    hud = pc.myHUD
+
+    for pickup in unrealsdk.find_all("WillowPickup"):
+        try:
+            if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
+                hidden.discard(pickup)
+                continue
+            if pickup.Inventory is None:
+                continue
+            usable = usable_now(pickup)
+        except Exception:
+            continue
+
+        if usable:
+            if pickup in hidden:
+                hidden.discard(pickup)
+                try:
+                    if hud is not None:
+                        hud.AddPostRenderedActor(pickup)
+                    pickup.SpawnPickupParticles()
+                except Exception:
+                    pass
+        elif pickup not in hidden:
+            hidden.add(pickup)
+            try:
+                if hud is not None:
+                    hud.RemovePostRenderedActor(pickup)
+                pickup.DestroyPickupParticles()
+            except Exception:
+                pass
+
+
 def sweep() -> None:
     """Everything lying around in the area that is worth walking over to.
 
@@ -602,7 +658,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, gear, black, shop_open, shop_frames
+    global frames, gear, black, shop_open, shop_frames, hide_frames
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or pc.myHUD is None:
@@ -616,6 +672,12 @@ def on_render(
     if frames >= REFRESH_FRAMES:
         frames = 0
         sweep()
+
+    if HideFull.value is True:
+        hide_frames += 1
+        if hide_frames >= HIDE_FRAMES:
+            hide_frames = 0
+            hide_the_full()
 
     if not marks:
         return

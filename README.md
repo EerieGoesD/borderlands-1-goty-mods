@@ -17,6 +17,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Mission Progress](MissionProgress) | Shows your mission progress and total game completion, following the Borderlands mission flow |
 | [Movement Speed Changer](MovementSpeedChanger) | Sets how fast you walk, run, aim, crouch and drive |
 | [No Backpack Limit](NoBackpackLimit) | Sets the backpack capacity limit |
+| [No Clip](NoClip) | Lets you fly through walls |
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
 | [No Reload](NoReload) | Your magazine never runs down |
 | [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |

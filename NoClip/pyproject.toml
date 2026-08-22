@@ -1,0 +1,19 @@
+[project]
+name = "NoClip"
+version = "1.0.0"
+authors = [{ name = "eeriegoesd" }]
+description = """Lets you fly through walls.
+
+For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
+
+[project.urls]
+"Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
+
+[tool.sdkmod]
+name = "No Clip"
+mod_type = "Standard"
+supported_games = ["BL1", "BL1E"]
+coop_support = "Unknown"
+auto_enable = true
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/NoClip/NoClip.sdkmod"
+license = {name = "GPL-3.0-or-later", url = "https://www.gnu.org/licenses/gpl-3.0.en.html" }

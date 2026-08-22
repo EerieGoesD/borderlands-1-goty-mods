@@ -11,14 +11,19 @@ from mods_base.options import ButtonOption
 # What the game calls a spot that enemies come out of.
 DEN = "PopulationOpportunityDen"
 
+# What the game calls an enemy.
+ENEMY = "WillowAIPawn"
+
 # How long to wait after you close the menu before starting, in frames.
 SETTLING = 30
 
 # How many spawn points are told at a time, so the game is not held up.
 BATCH = 4
 
-# Frames left to wait, and the spawn points still to be told.
+# Frames left to wait, the corpses still to be cleared, and the spawn points still
+# to be told.
 waiting = 0
+bodies: list = []
 to_do: list = []
 
 
@@ -52,7 +57,7 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Does the work once the menu is closed, a few spawn points at a time."""
-    global waiting, to_do
+    global waiting, bodies, to_do
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -68,9 +73,38 @@ def on_render(
         waiting -= 1
         if waiting == 0:
             try:
+                bodies = list(unrealsdk.find_all(ENEMY))
+            except Exception:
+                bodies = []
+            try:
                 to_do = list(unrealsdk.find_all(DEN))
             except Exception:
                 to_do = []
+        return
+
+    # The bodies you left on the ground are cleared away first.
+    if bodies:
+        batch = bodies[:BATCH]
+        del bodies[:BATCH]
+
+        for body in batch:
+            try:
+                if str(body.Name).startswith("Default__"):
+                    continue
+                if body.bDeleteMe is True or body.bPendingDelete is True:
+                    continue
+                if body.bIsDead is not True:
+                    continue
+
+                # The game will not let go of a body, so it is taken off screen
+                # and made unable to touch anything.
+                body.bHidden = True
+                body.SetCollision(False, False)
+                mesh = getattr(body, "Mesh", None)
+                if mesh is not None:
+                    mesh.SetHidden(True)
+            except Exception:
+                continue
         return
 
     if not to_do:

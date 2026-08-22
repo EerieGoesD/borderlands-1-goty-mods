@@ -5,6 +5,7 @@ Tested on both GOTY and GOTY Enhanced.
 
 | Mod | What it does |
 | --- | --- |
+| [Auto Loot](AutoLoot) | Picks loot up as you walk over it, no key press needed |
 | [Continuous Fire](ContinuousFire) | Guns that fire in bursts keep firing while you hold the trigger |
 | [Crash Debug](CrashDebug) | Notes what each mod is doing, so a crash says which one ran last |
 | [Gear Score](GearScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |

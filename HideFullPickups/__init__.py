@@ -7,8 +7,12 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 
-# Frames between checks for pickups that have become worth showing again.
-RECHECK_FRAMES = 5
+# Frames between one look at everything lying around.
+RECHECK_FRAMES = 60
+
+# How many pickups are looked at each frame, so the game is not held up all
+# at once.
+BATCH = 8
 
 
 # Temporary: logs what happens while you look at a pickup.
@@ -16,6 +20,9 @@ DEBUG = False
 
 hidden: set[UObject] = set()
 frames = 0
+
+# The pickups still waiting to be looked at.
+waiting_on: list = []
 
 
 dumped: set[str] = set()
@@ -134,18 +141,24 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames
-
-    frames += 1
-    if frames < RECHECK_FRAMES:
-        return
-    frames = 0
+    global frames, waiting_on
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return
 
-    for pickup in unrealsdk.find_all("WillowPickup"):
+    frames += 1
+    if frames >= RECHECK_FRAMES:
+        frames = 0
+        waiting_on = list(unrealsdk.find_all("WillowPickup"))
+
+    if not waiting_on:
+        return
+
+    batch = waiting_on[:BATCH]
+    del waiting_on[:BATCH]
+
+    for pickup in batch:
         if not alive(pickup):
             hidden.discard(pickup)
             continue

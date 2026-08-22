@@ -37,6 +37,7 @@ BANG_HEIGHT = 18
 
 GEAR_COLOUR = (120, 255, 140)
 SUPPLY_COLOUR = (90, 180, 255)
+HEALTH_COLOUR = (255, 120, 160)
 MONEY_COLOUR = (255, 210, 0)
 CHEST_COLOUR = (255, 60, 60)
 WHITE_CHEST_COLOUR = (245, 245, 245)
@@ -48,6 +49,7 @@ WHITE_CHEST = "InteractiveObj_Crate_Metal"
 ShowWeapons = BoolOption("Show Weapon Loot", True, "Yes", "No")
 ShowMoney = BoolOption("Show Money Loot", True, "Yes", "No")
 ShowAmmo = BoolOption("Show Ammo Loot", True, "Yes", "No")
+ShowHealth = BoolOption("Show Health Loot", True, "Yes", "No")
 ShowRedChests = BoolOption("Show Red Chests", True, "Yes", "No")
 ShowWhiteChests = BoolOption("Show White Chests", True, "Yes", "No")
 BetterOnly = BoolOption("Display Only Better Weapons", False, "Yes", "No")
@@ -99,9 +101,8 @@ def kind_of(pickup: UObject) -> str:
         return "money"
     if "ammodrop" in tag or "ammo" in tag:
         return "ammo"
-    # Health goes in with ammo: it shares the blue mark, and it can be full up too.
     if "health" in tag or "medkit" in tag:
-        return "ammo"
+        return "health"
     return "gear"
 
 
@@ -110,6 +111,8 @@ def wanted(kind: str) -> bool:
         return ShowMoney.value is True
     if kind == "ammo":
         return ShowAmmo.value is True
+    if kind == "health":
+        return ShowHealth.value is True
     return ShowWeapons.value is True
 
 
@@ -661,6 +664,13 @@ def on_render(
             B=SUPPLY_COLOUR[2],
             A=255,
         )
+        colours["health"] = unrealsdk.make_struct(
+            "Color",
+            R=HEALTH_COLOUR[0],
+            G=HEALTH_COLOUR[1],
+            B=HEALTH_COLOUR[2],
+            A=255,
+        )
         colours["money"] = unrealsdk.make_struct(
             "Color",
             R=MONEY_COLOUR[0],
@@ -735,6 +745,7 @@ build_mod(
         ShowWeapons,
         ShowMoney,
         ShowAmmo,
+        ShowHealth,
         ShowRedChests,
         ShowWhiteChests,
         BetterOnly,

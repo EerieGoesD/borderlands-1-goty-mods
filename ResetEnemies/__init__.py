@@ -22,6 +22,14 @@ waiting = 0
 to_do: list = []
 
 
+def master():
+    """The thing that does the spawning."""
+    for found in unrealsdk.find_all("WillowPopulationMaster"):
+        if not str(found.Name).startswith("Default__"):
+            return found
+    return None
+
+
 def reset_the_area(option: ButtonOption) -> None:
     """Lines the area up to be filled again once the menu is out of the way."""
     global waiting
@@ -32,7 +40,7 @@ def reset_the_area(option: ButtonOption) -> None:
 ResetNow = ButtonOption(
     "Reset Current Area",
     on_press=reset_the_area,
-    description="Close the menu, then walk away and back and the enemies are there again.",
+    description="Close the menu and the enemies come back at their own spawn points.",
 )
 
 
@@ -71,13 +79,30 @@ def on_render(
     batch = to_do[:BATCH]
     del to_do[:BATCH]
 
+    spawner = master()
+    if spawner is None:
+        to_do = []
+        return
+
     for den in batch:
         try:
+            if str(den.Name).startswith("Default__"):
+                continue
             if den.bDeleteMe is True or den.bPendingDelete is True:
                 continue
-            den.SetEnabledStatus(True)
-            den.Reset()
-        except Exception:
+
+            # The spot keeps a tally of everything it has ever sent out and a time
+            # it is not allowed to send anything before. Both are wound back so it
+            # treats the area as untouched.
+            tally = den.SpawnData
+            tally.NextSpawnTime = 0.0
+            tally.NumTotalActors = 0
+            den.SpawnData = tally
+
+            den.bNoRespawning = False
+            den.DoSpawning(spawner)
+        except Exception as ex:
+            logging.dev_warning(f"[Reset Enemies] {den.Name} would not fill ({ex})")
             continue
 
 

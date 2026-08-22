@@ -2,8 +2,8 @@
 
 Brings the enemies in the area back without reloading your save.
 
-In the mod's settings, click Reset Current Area. Walk away and back and the enemies
-are there again.
+In the mod's settings, click Reset Current Area. Close the menu and the enemies come
+back at their own spawn points.
 
 ## Install
 

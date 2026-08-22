@@ -79,6 +79,9 @@ trimmed_lines = None
 shop_open = False
 shop_frames = SHOP_FRAMES
 
+# Whether a menu was up last frame.
+menu_was_open = False
+
 font = None
 colours: dict[tuple[int, int, int], object] = {}
 
@@ -221,7 +224,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, cached_lines, trimmed_lines, shop_open, shop_frames
+    global frames, cached_lines, trimmed_lines, shop_open, shop_frames, menu_was_open
 
     pc = get_pc()
     if pc is None or pc.myHUD is None:
@@ -234,7 +237,14 @@ def on_render(
     # Out of the way while a menu, a shop or the pause screen is up.
     try:
         if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
+            menu_was_open = True
             return
+
+        # Straight after the mission log closes, the panel is worked out again, so
+        # picking a different mission shows up at once.
+        if menu_was_open:
+            menu_was_open = False
+            frames = REFRESH_FRAMES
 
         # A shop screen counts too. Asking the game which screen it is playing every
         # frame is too slow, so it is asked now and then and only the answer is kept.

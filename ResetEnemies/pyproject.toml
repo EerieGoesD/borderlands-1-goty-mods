@@ -1,8 +1,8 @@
 [project]
-name = "MissionProgress"
-version = "1.0.2"
+name = "ResetEnemies"
+version = "1.0.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Shows your mission progress and total game completion, following the Borderlands mission flow.
+description = """Brings the enemies in the area back without reloading your save.
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 
@@ -10,10 +10,10 @@ For full information about this mod and to report bugs, please visit: https://ee
 "Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
 
 [tool.sdkmod]
-name = "Mission Progress"
+name = "Reset Enemies"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = true
-download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/MissionProgress/MissionProgress.sdkmod"
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/ResetEnemies/ResetEnemies.sdkmod"
 license = {name = "GPL-3.0-or-later", url = "https://www.gnu.org/licenses/gpl-3.0.en.html" }

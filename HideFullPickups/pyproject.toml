@@ -1,6 +1,6 @@
 [project]
 name = "HideFullPickups"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Stops ammo you cannot carry from lighting up on the ground.
 

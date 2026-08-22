@@ -317,7 +317,14 @@ def on_render(
                     line = line[:-4] + "..."
                 trimmed_lines.append((line, colour))
 
+        # Lines past the bottom of the screen cannot be seen, and drawing them
+        # still costs, so the list stops where the screen does.
+        bottom = float(canvas.SizeY) - LINE_HEIGHT
+
         for line, colour in trimmed_lines:
+            if y > bottom:
+                break
+
             # A black pass all the way round first, so the words stand out against
             # whatever is behind them.
             canvas.DrawColor = colours[BLACK]

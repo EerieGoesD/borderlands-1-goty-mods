@@ -99,6 +99,9 @@ def kind_of(pickup: UObject) -> str:
         return "money"
     if "ammodrop" in tag or "ammo" in tag:
         return "ammo"
+    # Health goes in with ammo: it shares the blue mark, and it can be full up too.
+    if "health" in tag or "medkit" in tag:
+        return "ammo"
     return "gear"
 
 

@@ -17,6 +17,10 @@ FLYING = 4
 # How long a fall has to last before you are put back where you took off.
 LOST = 180
 
+# How far below your take off spot you have to be for it to count as a fall
+# through the map rather than a drop onto the ground.
+BELOW = 3000.0
+
 # What the game counts as half a turn, for working out where you are looking.
 HALF_TURN = 32768.0
 
@@ -114,7 +118,7 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Holds you in the air, catches a fall through the map, and writes the reading."""
-    global falling, font, white
+    global falling, took_off_at, font, white
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -185,14 +189,24 @@ def on_render(
 
             falling = 0
         elif took_off_at is not None and int(pawn.Physics) == IN_THE_AIR:
-            falling += 1
+            x, y, z = took_off_at
+
+            # Only a fall that carries on well below where you took off counts as
+            # going through the map. A normal drop lands long before that.
+            if float(pawn.Location.Z) < z - BELOW:
+                falling += 1
+            else:
+                falling = 0
+
             if falling >= LOST:
                 falling = 0
-                x, y, z = took_off_at
                 pawn.Location = unrealsdk.make_struct("Vector", X=x, Y=y, Z=z)
                 pawn.Velocity = unrealsdk.make_struct("Vector", X=0.0, Y=0.0, Z=0.0)
         else:
+            # Back on your feet, so the spot you took off from is forgotten and a
+            # normal jump is never mistaken for falling through the map.
             falling = 0
+            took_off_at = None
     except Exception as ex:
         logging.dev_warning(f"[No Clip] could not hold you up ({ex})")
         return

@@ -19,6 +19,7 @@ UNITS_PER_METRE = 50.0
 
 Reach = SliderOption("Reach in metres", 5, 1, 20, 1, True)
 LootAmmo = BoolOption("Loot Ammo", True, "Yes", "No")
+LootHealth = BoolOption("Loot Health", True, "Yes", "No")
 LootMoney = BoolOption("Loot Money", True, "Yes", "No")
 LootWeapons = BoolOption("Loot Weapons", True, "Yes", "No")
 
@@ -32,7 +33,7 @@ waiting_on: list = []
 
 
 def kind_of(pickup: UObject) -> str:
-    """Money, ammo, or gear you would carry away."""
+    """Money, ammo, health, or gear you would carry away."""
     try:
         tag = str(pickup.Inventory.DefinitionData.ItemDefinition).lower()
     except Exception:
@@ -40,6 +41,8 @@ def kind_of(pickup: UObject) -> str:
 
     if "currency" in tag or "credit" in tag or "money" in tag or "cash" in tag:
         return "money"
+    if "healthdrops" in tag or "health" in tag or "medkit" in tag:
+        return "health"
     if "ammodrop" in tag or "ammo" in tag:
         return "ammo"
     return "gear"
@@ -50,6 +53,8 @@ def wanted(kind: str) -> bool:
         return LootMoney.value is True
     if kind == "ammo":
         return LootAmmo.value is True
+    if kind == "health":
+        return LootHealth.value is True
     return LootWeapons.value is True
 
 
@@ -137,7 +142,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[LootWeapons, LootMoney, LootAmmo, Reach],
+    options=[LootWeapons, LootMoney, LootAmmo, LootHealth, Reach],
     keybinds=[],
     hooks=[on_render],
     commands=[],

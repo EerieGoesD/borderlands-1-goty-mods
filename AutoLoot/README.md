@@ -9,7 +9,8 @@ Anything within reach is collected as you walk past.
 - **Reach in metres**: How close the loot has to be.
 - **Loot Weapons**: Weapons and items.
 - **Loot Money**: Money.
-- **Loot Ammo**: Ammo and health.
+- **Loot Ammo**: Ammo.
+- **Loot Health**: Health kits and vials.
 
 ## Install
 

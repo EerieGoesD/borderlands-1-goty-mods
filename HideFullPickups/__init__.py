@@ -10,19 +10,12 @@ from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 # Frames between one look at everything lying around.
 RECHECK_FRAMES = 60
 
-# How many pickups are looked at each frame, so the game is not held up all
-# at once.
-BATCH = 8
-
 
 # Temporary: logs what happens while you look at a pickup.
 DEBUG = False
 
 hidden: set[UObject] = set()
 frames = 0
-
-# The pickups still waiting to be looked at.
-waiting_on: list = []
 
 
 dumped: set[str] = set()
@@ -141,24 +134,20 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, waiting_on
+    global frames
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return
 
     frames += 1
-    if frames >= RECHECK_FRAMES:
-        frames = 0
-        waiting_on = list(unrealsdk.find_all("WillowPickup"))
-
-    if not waiting_on:
+    if frames < RECHECK_FRAMES:
         return
+    frames = 0
 
-    batch = waiting_on[:BATCH]
-    del waiting_on[:BATCH]
-
-    for pickup in batch:
+    # Everything is looked at here and now. Holding on to a pickup between frames
+    # takes the game down, since the game frees it the moment somebody takes it.
+    for pickup in unrealsdk.find_all("WillowPickup"):
         if not alive(pickup):
             hidden.discard(pickup)
             continue

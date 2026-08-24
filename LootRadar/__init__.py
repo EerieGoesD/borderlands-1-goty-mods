@@ -342,6 +342,12 @@ def label(canvas, x: float, y: float, text: str, colour) -> None:
     canvas.DrawText(text, False, TEXT_SCALE, TEXT_SCALE)
 
 
+def forget(pickup: UObject) -> None:
+    """Drops a pickup from everything held between frames."""
+    hidden.discard(pickup)
+    kinds.pop(pickup, None)
+
+
 def alive(pickup: UObject) -> bool:
     """Whether the pickup still exists. Touching a gone one takes the game down."""
     try:
@@ -385,6 +391,10 @@ def on_pick_up(
     """A gun no better than the one you carry stays on the ground."""
     if BetterOnly.value is True and not worth_taking(obj):
         return Block
+
+    # It is about to leave the world, so it is dropped from everything we are
+    # holding on to. Touching it later, once the game has let go, is fatal.
+    forget(obj)
     return None
 
 
@@ -424,12 +434,8 @@ CHESTS_EVERY = 1
 chest_list: list[tuple[UObject, str]] = []
 chest_frames = CHESTS_EVERY
 
-# The pickups still waiting to be looked at, and the marks being built up.
-waiting_on: list = []
+# The marks being built up as the pickups are looked at.
 waiting_marks: list = []
-
-# How many pickups are looked at each frame.
-BATCH = 8
 
 # What each pickup turned out to be, so its name is only read once.
 kinds: dict[UObject, str] = {}
@@ -544,12 +550,12 @@ def sweep() -> None:
     except Exception:
         on_screen = None
 
-    # The pickups are handled a handful at a time, spread over the frames until the
-    # next sweep, so the game is not held up all at once.
-    global waiting_on, waiting_marks
-    waiting_on = list(unrealsdk.find_all("WillowPickup"))
+    # Everything is looked at here and now. Holding on to a pickup between frames
+    # takes the game down, since the game frees it the moment somebody takes it.
+    global waiting_marks
     waiting_marks = found
-    marks = found
+    step_through(pawn, hud, on_screen, hiding, unrealsdk.find_all("WillowPickup"))
+    marks = waiting_marks
 
 
 def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
@@ -563,7 +569,9 @@ def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
                 continue
 
             takeable = can_take(pickup, pawn)
-            carryable = usable_now(pickup)
+            # Guns and gear stay on screen whatever level they ask for, since you
+            # can still carry them and use them later.
+            carryable = takeable
         except Exception:
             continue
 
@@ -646,21 +654,6 @@ def on_render(
     if frames >= REFRESH_FRAMES:
         frames = 0
         sweep()
-    elif waiting_on:
-        batch = waiting_on[:BATCH]
-        del waiting_on[:BATCH]
-
-        pawn = getattr(pc.Pawn, "Driver", None) or pc.Pawn
-        hiding = HideFull.value is True or BetterOnly.value is True
-        hud = pc.myHUD
-        try:
-            on_screen = set(hud.PostRenderedActors) if hud is not None else set()
-        except Exception:
-            on_screen = None
-
-        step_through(pawn, hud, on_screen, hiding, batch)
-        if not waiting_on:
-            marks = waiting_marks
 
     if not marks:
         return

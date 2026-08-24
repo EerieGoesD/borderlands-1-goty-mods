@@ -21,6 +21,10 @@ COLOUR = (255, 210, 0)
 # Frames between recalculations.
 REFRESH_FRAMES = 60
 
+# The route is worked out midway between two readings, so the two never land on the
+# same frame and neither is felt.
+ROUTE_ON_FRAME = 30
+
 ShowDistance = BoolOption("Show Distance", True, "On", "Off")
 ShowRoute = BoolOption("Show Route Line", True, "On", "Off")
 Units = SpinnerOption("Units", value="Metres", choices=["Metres", "Feet"], wrap_enabled=True)
@@ -306,6 +310,29 @@ MAP_RETRY = 2.0
 map_asked = 0.0
 
 
+# The thing that knows which mission you are on, kept between checks rather than
+# looked up again every time.
+tracker = None
+
+
+def mission_tracker():
+    """Whatever the game is using to track missions."""
+    global tracker
+
+    try:
+        if tracker is not None and getattr(tracker, "bDeleteMe", False) is not True:
+            return tracker
+    except Exception:
+        pass
+
+    try:
+        found = list(unrealsdk.find_all("MissionTracker"))
+    except Exception:
+        found = []
+    tracker = found[-1] if found else None
+    return tracker
+
+
 def map_waypoint(live: frozenset):
     """Where the map screen puts the waypoint marker.
 
@@ -322,7 +349,7 @@ def map_waypoint(live: frozenset):
     # builds them, but not on every single check.
     try:
         now = float(pc.WorldInfo.TimeSeconds)
-        mission = list(unrealsdk.find_all("MissionTracker"))[-1].ActiveMission
+        mission = mission_tracker().ActiveMission
         mark = (
             mission,
             getattr(mission, "TargetWaypointDefinition", None),
@@ -409,7 +436,7 @@ def waypoint_distance() -> float | None:
     global cached_target, settling
 
     try:
-        mission = list(unrealsdk.find_all("MissionTracker"))[-1].ActiveMission
+        mission = mission_tracker().ActiveMission
         here = get_pc().Pawn.Location
     except Exception:
         return None
@@ -1091,8 +1118,8 @@ def on_render(
     if frames >= REFRESH_FRAMES:
         frames = 0
         cached_text = build_text()
-        if ShowRoute.value is True:
-            refresh_route(pc.Pawn.Location)
+    elif frames == ROUTE_ON_FRAME and ShowRoute.value is True:
+        refresh_route(pc.Pawn.Location)
 
     if ShowRoute.value is True:
         try:

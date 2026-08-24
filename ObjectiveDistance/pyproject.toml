@@ -1,6 +1,6 @@
 [project]
 name = "ObjectiveDistance"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Shows how far your objective is, plus a line on the ground showing the way.
 

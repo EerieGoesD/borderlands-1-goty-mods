@@ -11,6 +11,10 @@ from mods_base.options import BoolOption
 
 PickOnOpen = BoolOption("Pick at the terminal", False, "Yes", "No")
 
+# How many colours the terminal shows at once. The bank holds one set of these per
+# kind of vehicle, one after the other, and a set only belongs to its own vehicle.
+SWATCHES = 8
+
 # True while we are doing the painting ourselves, so we do not call it forever.
 painting = False
 
@@ -44,13 +48,16 @@ def colours() -> list:
 
 def move_the_tick(spot: int) -> None:
     """Puts the terminal's tick on the colour we picked."""
+    # The terminal counts from the start of this vehicle's own set of colours.
+    cell = spot % SWATCHES
+
     for menu in unrealsdk.find_all("VehicleSpawnStationGFxMovie"):
         if str(menu.Name).startswith("Default__"):
             continue
         try:
-            menu.PrimaryColorIndex = spot
-            menu.AS_SetPrimaryColorIndex(spot)
-            menu.AS_UpdateColorBox(f"cell{spot + 1}")
+            menu.PrimaryColorIndex = cell
+            menu.AS_SetPrimaryColorIndex(cell)
+            menu.AS_UpdateColorBox(f"cell{cell + 1}")
         except Exception as ex:
             logging.dev_warning(f"[Random Vehicle Colour] could not move the tick ({ex})")
 
@@ -70,7 +77,8 @@ def opened() -> None:
         if not bank:
             return
 
-        chosen = randrange(len(bank))
+        # One of the eight the terminal is showing, whichever vehicle that is for.
+        chosen = randrange(min(SWATCHES, len(bank)))
         waiting = chosen
         waited = 0
     except Exception as ex:
@@ -169,18 +177,24 @@ def on_paint(
 
         # Anything wearing a colour the Catch-a-Ride does not offer is another
         # kind of vehicle, and painting it wrecks its look.
+        names = [str(c.Material) for c in bank]
         was = str(args.MatInst)
-        if was not in [str(c.Material) for c in bank]:
+        if was not in names:
             return None
+
+        # Only the set this vehicle's own colour sits in will do. Handing it one
+        # from another vehicle's set wrecks how it looks.
+        first = (names.index(was) // SWATCHES) * SWATCHES
+        mine = range(first, min(first + SWATCHES, len(bank)))
 
         if PickOnOpen.value is True:
             # You have picked your own since we offered one, so leave it alone.
             if chosen is None:
                 return None
-            spot = chosen
+            spot = first + (chosen % SWATCHES)
         else:
             # The one the game picked is left out, so the car always looks different.
-            spots = [i for i, c in enumerate(bank) if str(c.Material) != was]
+            spots = [i for i in mine if names[i] != was]
             if not spots:
                 return None
             spot = choice(spots)

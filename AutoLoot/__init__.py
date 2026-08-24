@@ -8,11 +8,8 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption
 
-# Frames between rebuilds of the list of loot lying about.
+# Frames between one look at everything lying about.
 REFRESH_FRAMES = 15
-
-# How many are looked at each frame, so the game is not held up.
-BATCH = 12
 
 # The game measures in its own units. Fifty of them make a metre.
 UNITS_PER_METRE = 50.0
@@ -25,11 +22,6 @@ LootWeapons = BoolOption("Loot Weapons", True, "Yes", "No")
 
 frames = REFRESH_FRAMES
 
-# What each pickup turned out to be, so its name is only read once.
-kinds: dict[UObject, str] = {}
-
-# The loot still to be looked at, a few each frame.
-waiting_on: list = []
 
 
 def kind_of(pickup: UObject) -> str:
@@ -82,26 +74,16 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, waiting_on
+    global frames
 
     me = on_foot()
     if me is None:
-        waiting_on = []
         return
 
     frames += 1
-    if frames >= REFRESH_FRAMES:
-        frames = 0
-        try:
-            waiting_on = list(unrealsdk.find_all("WillowPickup"))
-        except Exception:
-            waiting_on = []
-
-    if not waiting_on:
+    if frames < REFRESH_FRAMES:
         return
-
-    batch = waiting_on[:BATCH]
-    del waiting_on[:BATCH]
+    frames = 0
 
     try:
         here = me.Location
@@ -110,7 +92,9 @@ def on_render(
 
     reach = Reach.value * UNITS_PER_METRE
 
-    for pickup in batch:
+    # Everything is looked at here and now. Holding on to a pickup between frames
+    # takes the game down, since the game frees it the moment somebody takes it.
+    for pickup in unrealsdk.find_all("WillowPickup"):
         try:
             if pickup.bPickupable is not True or pickup.Inventory is None:
                 continue
@@ -124,11 +108,13 @@ def on_render(
             if gap > reach:
                 continue
 
-            kind = kinds.get(pickup)
-            if kind is None:
-                kind = kind_of(pickup)
-                kinds[pickup] = kind
+            kind = kind_of(pickup)
             if not wanted(kind):
+                continue
+
+            # Ammo, money and health you are already full up on are left alone,
+            # asked the way the game asks it.
+            if pickup.Inventory.CanBeUsedBy(me) is not True:
                 continue
 
             # False leaves what you are holding alone, it just goes in the backpack.

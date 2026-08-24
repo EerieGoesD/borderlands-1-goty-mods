@@ -1,6 +1,6 @@
 [project]
 name = "CrashDebug"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Keeps a running note of what every mod is doing, so after a crash you can see which one ran last.
 

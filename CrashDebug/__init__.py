@@ -26,6 +26,9 @@ PLACES = {
 SLOT_SIZE = 160
 SLOTS = 128
 
+# What the newest line is marked with, so the crash is easy to find.
+NEWEST = "  <<< LAST"
+
 # How often the list of mods is looked at again, in frames.
 RESCAN_FRAMES = 300
 
@@ -79,6 +82,9 @@ KeepSlots = SliderOption("Lines Kept", SLOTS, 32, 512, 32, True)
 
 log_file: int | None = None
 written = 0
+
+# Where the newest line sits, so its mark can be wiped when the next one lands.
+last_slot: int | None = None
 broken = False
 wrapped: set = set()
 frames = 0
@@ -117,7 +123,10 @@ def start_log(place: str | None = None, ending: str | None = None) -> None:
 
     global broken
 
+    global last_slot
+
     written = 0
+    last_slot = None
     broken = False
     note("Crash Debug started")
 
@@ -135,21 +144,27 @@ def stop_log() -> None:
 
 def note(text: str) -> None:
     """Puts one line down, in the next slot along."""
-    global written
+    global written, last_slot
 
     if log_file is None:
         return
 
     clock = time.strftime("%H:%M:%S")
-    line = f"{written:08d}  {clock}  {text}"[: SLOT_SIZE - 1]
+    line = f"{written:08d}  {clock}  {text}"[: SLOT_SIZE - len(NEWEST) - 1]
     # The spare room sits before the line break, so no blank stretch is left in front
-    # of the next one.
-    line = line + " " * (SLOT_SIZE - len(line) - 1) + "\n"
+    # of the next one. The end of the newest line says so, since the lines are written
+    # round and round rather than one after the other.
+    line = line + " " * (SLOT_SIZE - len(line) - len(NEWEST) - 1) + NEWEST + "\n"
     where = (written % int(KeepSlots.value)) * SLOT_SIZE
 
     try:
         os.lseek(log_file, where, os.SEEK_SET)
         os.write(log_file, line.encode("utf-8", "replace"))
+
+        # The line before it is not the newest any more, so its mark comes off.
+        if last_slot is not None and last_slot != where:
+            os.lseek(log_file, last_slot + SLOT_SIZE - len(NEWEST) - 1, os.SEEK_SET)
+            os.write(log_file, b" " * len(NEWEST))
     except Exception as ex:
         global broken
         if not broken:
@@ -157,6 +172,7 @@ def note(text: str) -> None:
             logging.dev_warning(f"[Crash Debug] could not write the note ({ex})")
         return
 
+    last_slot = where
     written += 1
 
 

@@ -143,8 +143,8 @@ BASE_FLOW: list[tuple[str, list[str]]] = [
             "Green Thumb",
         ],
     ),
-    ("Jaynistown: A Brother's Love", ["Dumpster Diving For Great Justice"]),
-    ("Jaynistown: Spread The Word", []),
+    ("Jaynistown: A Brother's Love", []),
+    ("Jaynistown: Spread The Word", ["Dumpster Diving For Great Justice"]),
     (
         "Jaynistown: Getting What's Coming To You",
         ["Wanted: Fresh Fish", "I've Got A Sinking Feeling..."],
@@ -301,10 +301,12 @@ DLC_FLOW: list[tuple[str, list[str]]] = (
 
 
 class Flow:
-    """The mission order, flattened and indexed, with or without the DLC."""
+    """The mission order, flattened and indexed, with or without the DLC and sides."""
 
-    def __init__(self, include_dlc: bool) -> None:
+    def __init__(self, include_dlc: bool, include_sides: bool = True) -> None:
         flow = BASE_FLOW + (DLC_FLOW if include_dlc else [])
+        if not include_sides:
+            flow = [(main, []) for main, _ in flow]
 
         self.main: list[str] = [name for name, _ in flow]
         self.flat: list[str] = [
@@ -322,5 +324,9 @@ class Flow:
 
 BASE_ONLY = Flow(False)
 WITH_DLC = Flow(True)
+
+# The same two again with the side missions left out.
+BASE_ONLY_MAIN = Flow(False, False)
+WITH_DLC_MAIN = Flow(True, False)
 
 ALL_MISSIONS: list[str] = WITH_DLC.flat

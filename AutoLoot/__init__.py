@@ -8,8 +8,9 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption
 
-# Frames between one look at everything lying about.
-REFRESH_FRAMES = 15
+# Frames between one look at everything lying about. Twice a second: each look
+# walks every object in the area, so more often than this shows as stutter.
+REFRESH_FRAMES = 30
 
 # The game measures in its own units. Fifty of them make a metre.
 UNITS_PER_METRE = 50.0

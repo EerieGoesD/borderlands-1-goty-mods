@@ -79,6 +79,9 @@ GROUND_REACH = 600.0
 # How far you walk before the route is worked out again.
 REBUILD_AFTER = 600.0
 
+# A target further than this from any walkable spot is a bad reading, not a place.
+FARTHEST = 1000000.0
+
 # Mission still being worked on, as opposed to done and waiting to be handed in.
 STATUS_ACTIVE = 1
 
@@ -667,8 +670,15 @@ def walk_towards(
         return []
 
     path = [finish]
+    seen = {finish}
     while path[-1] != start:
-        path.append(came[path[-1]])
+        step = came.get(path[-1])
+        # A step that leads nowhere, or back to one already walked, would go round
+        # for ever and take the game with it.
+        if step is None or step in seen:
+            return []
+        seen.add(step)
+        path.append(step)
     path.reverse()
     return [graph_pos[i] for i in path]
 
@@ -764,8 +774,15 @@ def find_route(
         return []
 
     path = [start]
+    seen = {start}
     while path[-1] != goal:
-        path.append(onward[path[-1]])
+        step = onward.get(path[-1])
+        # A step that leads nowhere, or back to one already walked, would go round
+        # for ever and take the game with it.
+        if step is None or step in seen:
+            return []
+        seen.add(step)
+        path.append(step)
     return [graph_pos[i] for i in path]
 
 
@@ -831,8 +848,16 @@ def follow_ground(
         ax, ay, az = route[index]
         bx, by, bz = route[index + 1]
         span = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
-        steps = max(int(span / ROUTE_STEP), 1)
+        if not math.isfinite(span):
+            break
+
+        # One stretch never gets more steps than the whole line can hold. Without
+        # this, a target far off in another area meant thousands of floor checks
+        # in one frame, and the game never came back.
+        steps = max(min(int(span / ROUTE_STEP), ROUTE_MAX_POINTS), 1)
         for part in range(steps):
+            if len(dense) >= ROUTE_MAX_POINTS:
+                break
             share = part / steps
             x = ax + (bx - ax) * share
             y = ay + (by - ay) * share
@@ -885,6 +910,24 @@ def refresh_route(here) -> None:
 
     route_from = start_point
     route_goal = goal_point
+
+    # A reading that is nowhere near the area is not somewhere to walk to.
+    if not all(math.isfinite(v) for v in goal_point):
+        cached_route = []
+        return
+    close = nearest_node(goal_point)
+    if close < 0:
+        cached_route = []
+        return
+    cx, cy, cz = graph_pos[close]
+    gap = (
+        (goal_point[0] - cx) ** 2
+        + (goal_point[1] - cy) ** 2
+        + (goal_point[2] - cz) ** 2
+    ) ** 0.5
+    if gap > FARTHEST:
+        cached_route = []
+        return
 
     route = []
     for last in nearest_nodes(goal_point, 3):

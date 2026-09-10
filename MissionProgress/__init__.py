@@ -8,7 +8,13 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
-from .missions import ALL_MISSIONS, BASE_ONLY, WITH_DLC
+from .missions import (
+    ALL_MISSIONS,
+    BASE_ONLY,
+    BASE_ONLY_MAIN,
+    WITH_DLC,
+    WITH_DLC_MAIN,
+)
 
 FONT = "ui_fonts.font_willowbody_18pt"
 
@@ -66,6 +72,7 @@ EnableDLC = BoolOption("Enable DLC Missions", True, "Yes", "No")
 NextCount = SliderOption("Upcoming missions shown", 3, 0, 8, 1, True)
 ShowSkipped = BoolOption("Flag Skipped Missions", True, "On", "Off")
 ShowWarnings = BoolOption("Achievement Warnings", True, "On", "Off")
+EnableSide = BoolOption("Enable Side Missions", True, "Yes", "No")
 
 definitions: dict[str, UObject] = {}
 
@@ -154,7 +161,10 @@ def tracked_name() -> str | None:
 
 
 def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
-    flow = WITH_DLC if EnableDLC.value is True else BASE_ONLY
+    if EnableDLC.value is True:
+        flow = WITH_DLC if EnableSide.value is True else WITH_DLC_MAIN
+    else:
+        flow = BASE_ONLY if EnableSide.value is True else BASE_ONLY_MAIN
 
     finished = completed_names()
 
@@ -355,7 +365,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[EnableDLC, ShowSkipped, ShowWarnings, NextCount, Position],
+    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position],
     keybinds=[],
     hooks=[on_render],
     commands=[],

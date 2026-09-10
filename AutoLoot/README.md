@@ -7,6 +7,7 @@ Anything within reach is collected as you walk past.
 ## Settings
 
 - **Reach in metres**: How close the loot has to be.
+- **Checks per second**: How often loot around you is looked for. Lower is better for performance.
 - **Loot Weapons**: Weapons and items.
 - **Loot Money**: Money.
 - **Loot Ammo**: Ammo.

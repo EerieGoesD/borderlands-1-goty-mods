@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import unrealsdk  # type: ignore
@@ -8,20 +9,27 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption
 
-# Frames between one look at everything lying about. Twice a second: each look
-# walks every object in the area, so more often than this shows as stutter.
-REFRESH_FRAMES = 30
-
 # The game measures in its own units. Fifty of them make a metre.
 UNITS_PER_METRE = 50.0
 
 Reach = SliderOption("Reach in metres", 5, 1, 20, 1, True)
+# Each look walks every object in the area, so more often shows as stutter.
+ChecksPerSecond = SliderOption(
+    "Checks per second",
+    1,
+    1,
+    10,
+    1,
+    True,
+    description="How often loot around you is looked for. Lower is better for performance.",
+)
 LootAmmo = BoolOption("Loot Ammo", True, "Yes", "No")
 LootHealth = BoolOption("Loot Health", True, "Yes", "No")
 LootMoney = BoolOption("Loot Money", True, "Yes", "No")
 LootWeapons = BoolOption("Loot Weapons", True, "Yes", "No")
 
-frames = REFRESH_FRAMES
+# When loot was last looked for, so the slider means seconds whatever the frame rate.
+last_look = 0.0
 
 
 
@@ -75,16 +83,16 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames
+    global last_look
 
     me = on_foot()
     if me is None:
         return
 
-    frames += 1
-    if frames < REFRESH_FRAMES:
+    now = time.monotonic()
+    if now - last_look < 1.0 / max(int(ChecksPerSecond.value), 1):
         return
-    frames = 0
+    last_look = now
 
     try:
         here = me.Location
@@ -129,7 +137,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[LootWeapons, LootMoney, LootAmmo, LootHealth, Reach],
+    options=[LootWeapons, LootMoney, LootAmmo, LootHealth, Reach, ChecksPerSecond],
     keybinds=[],
     hooks=[on_render],
     commands=[],

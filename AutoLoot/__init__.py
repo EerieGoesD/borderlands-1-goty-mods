@@ -89,6 +89,10 @@ def on_render(
     if me is None:
         return
 
+    pc = get_pc()
+    if pc is None:
+        return
+
     now = time.monotonic()
     if now - last_look < 1.0 / max(int(ChecksPerSecond.value), 1):
         return
@@ -126,8 +130,13 @@ def on_render(
             if pickup.Inventory.CanBeUsedBy(me) is not True:
                 continue
 
+            # The game's own pick up, the same as pressing the key on it. Taking
+            # the item straight out of the pickup left an empty husk behind that
+            # the game still thought you were standing on, and it took the key
+            # with a "Full" prompt whenever you tried to open a chest or a shop.
             # False leaves what you are holding alone, it just goes in the backpack.
-            pickup.GiveTo(me, False)
+            pc.TouchedPickupable(pickup)
+            pc.PickupSomething(False)
         except Exception:
             continue
 

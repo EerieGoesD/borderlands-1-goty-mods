@@ -16,6 +16,7 @@ itself, unrounded, so it can differ slightly from the card.
 - **Disregard Accuracy**: Assumes every bullet hits. Turn it off and the DPS is scaled by the gun's accuracy.
 - **Disregard Critical**: Ignores critical hits. Turn it off and the DPS is multiplied by the gun's own critical bonus, as if every shot were a critical.
 - **Disregard Elements**: Ignores burn, shock and corrosion. Turn it off and the extra damage an elemental gun throws is added, scaled by its x1 to x4 rating.
+- **Compare vs current gear**: Adds indicators comparing the gun with the guns you carry, equipped and in your backpack: your best of all, of the same weapon type, of the same element, and of both. Off by default.
 - **Score font size**: How big the number is printed on the card.
 
 ## Install

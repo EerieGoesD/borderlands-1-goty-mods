@@ -14,6 +14,9 @@ PICKUP_CARD = "inventory.card1"
 
 LABEL = "Expected DPS"
 SHIELD_LABEL = "Shield Power"
+# The comparison line has no heading of its own, so it is known by the four group
+# names it always carries, in order.
+COMPARISON = re.compile(r"^All\W+\S\W+Type\W+\S\W+Element\W+\S\W+Both\W")
 
 # Seconds of fighting the shield score is measured over.
 SHIELD_WINDOW = 60.0
@@ -28,12 +31,17 @@ NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 BLOCK = re.compile(r"<TEXTFORMAT.*?</TEXTFORMAT>|<font.*?</font>", re.IGNORECASE | re.DOTALL)
 
 
+def is_comparison(plain: str) -> bool:
+    return COMPARISON.match(plain.replace(chr(160), " ")) is not None
+
+
 def without_ours(text: str) -> str:
     """The card's text with our own lines taken out, however the game has written them."""
 
     def drop(match: re.Match[str]) -> str:
         plain = TAGS.sub("", match.group(0)).strip()
-        return "" if plain.startswith((LABEL, SHIELD_LABEL)) else match.group(0)
+        ours = plain.startswith((LABEL, SHIELD_LABEL)) or is_comparison(plain)
+        return "" if ours else match.group(0)
 
     return "\n".join(line for line in BLOCK.sub(drop, text).split("\n") if line.strip())
 
@@ -41,6 +49,37 @@ DisregardAccuracy = BoolOption("Disregard Accuracy", True, "Yes", "No")
 DisregardCritical = BoolOption("Disregard Critical", True, "Yes", "No")
 DisregardElements = BoolOption("Disregard Elements", False, "Yes", "No")
 FontSize = SliderOption("Score font size", 9, 0, 24, 1, True)
+ShowComparison = BoolOption(
+    "Compare vs current gear",
+    False,
+    "Yes",
+    "No",
+    description=(
+        "Adds indicators comparing the gun vs the guns you carry,"
+        " equipped and in your backpack.\n"
+        "All: vs the strongest gun of any kind.\n"
+        "Type: vs the strongest gun of the same weapon type.\n"
+        "Element: vs the strongest gun with the same element."
+        " No element counts as its own element.\n"
+        "Both: vs the strongest gun with the same type and the same element.\n\n"
+        "+ = your best\n"
+        "- = worse than your best\n"
+        "= = same as your best\n"
+        "? = nothing to compare"
+    ),
+)
+
+# How many things to walk through before giving up, so a huge backpack cannot
+# hold the menu up.
+CARRY_LIMIT = 300
+
+# Scores within this much of each other count as the same.
+CLOSE_ENOUGH = 0.02
+
+BETTER = "#7ce87c"
+WORSE = "#e87c7c"
+SAME = "#d0d0d0"
+GREY = "#808080"
 
 CRIT_ATTRIBUTE = "PlayerCriticalHitBonus"
 
@@ -416,6 +455,117 @@ def get_shield_score(item: UObject) -> float | None:
     return capacity + rate * max(SHIELD_WINDOW - delay, 0)
 
 
+def carried_weapons() -> list[UObject]:
+    """Every gun you have on you, in the backpack and in your hands."""
+    found: list[UObject] = []
+
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        return found
+
+    try:
+        manager = pc.Pawn.InvManager
+    except Exception:
+        return found
+
+    for name in ("Backpack", "InventoryChain"):
+        held = getattr(manager, name, None)
+        if held is None:
+            continue
+        try:
+            if isinstance(held, UObject):
+                # A chain, each gun pointing at the next.
+                item = held
+                while item is not None and len(found) < CARRY_LIMIT:
+                    found.append(item)
+                    item = getattr(item, "Inventory", None)
+            else:
+                for item in held:
+                    if item is None:
+                        continue
+                    found.append(item)
+                    if len(found) >= CARRY_LIMIT:
+                        break
+        except Exception:
+            continue
+
+    return [item for item in found if is_weapon(item)]
+
+
+def read_kind(weapon: UObject) -> str | None:
+    """Which kind of gun it is, such as combat rifle or assault shotgun.
+
+    The game keeps a few copies of some kinds under slightly different names, marked
+    BSG or stock, and those count as the same kind.
+    """
+    try:
+        name = str(weapon.DefinitionData.WeaponTypeDefinition.Name).lower()
+    except Exception:
+        return None
+
+    for part in ("bsg_", "weapontype_"):
+        if name.startswith(part):
+            name = name[len(part):]
+    if name.endswith("_stock"):
+        name = name[: -len("_stock")]
+    return name or None
+
+
+def mark(score: float, best: float | None) -> str:
+    """How this gun stands against the best of its group, as one coloured sign."""
+    if best is None:
+        return f'<font color="{GREY}">?</font>'
+    if score > best * (1 + CLOSE_ENOUGH):
+        return f'<font color="{BETTER}">+</font>'
+    if score < best * (1 - CLOSE_ENOUGH):
+        return f'<font color="{WORSE}">-</font>'
+    return f'<font color="{SAME}">=</font>'
+
+
+def comparison_line(weapon: UObject, score: float) -> str | None:
+    """One line saying how the gun stands against the best you carry."""
+    kind = read_kind(weapon)
+    element = read_element(weapon)
+
+    bests: dict[str, float | None] = {
+        "All": None,
+        "Type": None,
+        "Element": None,
+        "Both": None,
+    }
+
+    for other in carried_weapons():
+        if other is weapon:
+            continue
+        theirs = get_dps(None, "", other)
+        if theirs is None:
+            continue
+
+        same_kind = kind is not None and read_kind(other) == kind
+        same_element = read_element(other) == element
+
+        groups = ["All"]
+        if same_kind:
+            groups.append("Type")
+        if same_element:
+            groups.append("Element")
+        if same_kind and same_element:
+            groups.append("Both")
+
+        for group in groups:
+            if bests[group] is None or theirs > bests[group]:
+                bests[group] = theirs
+
+    if all(best is None for best in bests.values()):
+        return None
+
+    # The card squeezes a run of spaces down to one, so the gap between groups is
+    # held open with spaces that do not squeeze, and each mark is kept tight to its
+    # own label. One ordinary space stays in each gap so a long line can still wrap.
+    parts = [f"{name}&nbsp;{mark(score, best)}" for name, best in bests.items()]
+    return "&nbsp; ".join(parts)
+
+
 def apply_line(movie: UObject, card: str, label: str, value: float | None) -> None:
     path = f"{card}.funstats.htmlText"
     text = without_ours(get_string(movie, path))
@@ -433,6 +583,23 @@ def apply_line(movie: UObject, card: str, label: str, value: float | None) -> No
 def apply_dps(movie: UObject, card: str, weapon: UObject | None) -> None:
     dps = None if weapon is None else get_dps(movie, card, weapon)
     apply_line(movie, card, LABEL, dps)
+
+    if weapon is None or dps is None or ShowComparison.value is not True:
+        return
+
+    try:
+        line = comparison_line(weapon, dps)
+    except Exception as ex:
+        logging.dev_warning(f"[{LABEL}] could not compare ({ex})")
+        return
+
+    if line is None:
+        return
+
+    path = f"{card}.funstats.htmlText"
+    text = get_string(movie, path)
+    ours = f'<font size="{FontSize.value}">{line}</font>'
+    movie.SetVariableString(path, f"{ours}\n{text}" if text else ours)
 
 
 def apply_shield(movie: UObject, card: str, item: UObject | None) -> None:
@@ -575,6 +742,10 @@ def on_vendor_panel(
 # Neither of these is used at the moment: they fill the card before the game has
 # put its bonus lines on, which loses them.
 ENHANCED_ONLY = ()
+
+# Older copies of the SDK do not know Enhanced by name at all, and asking for it by
+# name there stops the whole mod loading.
+ON_ENHANCED = getattr(Game, "BL1E", None) is not None and Game.get_current() is Game.BL1E
 
 
 @hook(
@@ -915,6 +1086,7 @@ build_mod(
         DisregardAccuracy,
         DisregardCritical,
         DisregardElements,
+        ShowComparison,
         FontSize,
     ],
     keybinds=[],
@@ -934,7 +1106,7 @@ build_mod(
         on_pool_tick,
         on_sorting,
         on_sorted,
-        *(ENHANCED_ONLY if Game.get_current() is Game.BL1E else ()),
+        *(ENHANCED_ONLY if ON_ENHANCED else ()),
     ],
     commands=[],
     settings_file=Path(f"{SETTINGS_DIR}/GearScore.json"),

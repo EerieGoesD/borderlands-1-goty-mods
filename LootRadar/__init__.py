@@ -26,7 +26,10 @@ SHOP_FRAMES = 10
 # Enhanced draws its bar lower down than the original does.
 COMPASS_CENTRE = 0.5
 COMPASS_HALF_WIDTH = 0.143
-COMPASS_TOP = 0.885 if Game.get_current() is Game.BL1E else 0.833
+# Older copies of the SDK do not know Enhanced by name at all, and asking for it by
+# name there stops the whole mod loading.
+ON_ENHANCED = getattr(Game, "BL1E", None) is not None and Game.get_current() is Game.BL1E
+COMPASS_TOP = 0.885 if ON_ENHANCED else 0.833
 COMPASS_ARC = 45.0
 
 # How far above the bar the marks sit, and how big they are.

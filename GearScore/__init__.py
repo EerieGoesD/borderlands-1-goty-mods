@@ -15,8 +15,9 @@ PICKUP_CARD = "inventory.card1"
 LABEL = "Expected DPS"
 SHIELD_LABEL = "Shield Power"
 # The comparison line has no heading of its own, so it is known by the four group
-# names it always carries, in order.
-COMPARISON = re.compile(r"^All\W+\S\W+Type\W+\S\W+Element\W+\S\W+Both\W")
+# names it always carries, in order. A gun with no element says No Elem in place of
+# Element.
+COMPARISON = re.compile(r"^All\W+\S\W+Type\W+\S\W+(?:Element|No\W+Elem)\W+\S\W+Both\W")
 
 # Seconds of fighting the shield score is measured over.
 SHIELD_WINDOW = 60.0
@@ -64,17 +65,13 @@ ShowComparison = BoolOption(
         "Both: vs the strongest gun with the same type and the same element.\n\n"
         "+ = your best\n"
         "- = worse than your best\n"
-        "= = same as your best\n"
-        "? = nothing to compare"
+        "= = same as your best"
     ),
 )
 
 # How many things to walk through before giving up, so a huge backpack cannot
 # hold the menu up.
 CARRY_LIMIT = 300
-
-# Scores within this much of each other count as the same.
-CLOSE_ENOUGH = 0.02
 
 BETTER = "#7ce87c"
 WORSE = "#e87c7c"
@@ -493,31 +490,37 @@ def carried_weapons() -> list[UObject]:
 
 
 def read_kind(weapon: UObject) -> str | None:
-    """Which kind of gun it is, such as combat rifle or assault shotgun.
+    """Which weapon type the game files the gun under, the same groups the shop and
+    backpack headings show, such as Assault Rifles or Repeaters.
 
-    The game keeps a few copies of some kinds under slightly different names, marked
-    BSG or stock, and those count as the same kind.
+    The game builds those headings from the ammo each gun takes, so a support machine
+    gun sits with the combat rifles. Eridian weapons take no ammo and are a group of
+    their own.
     """
     try:
-        name = str(weapon.DefinitionData.WeaponTypeDefinition.Name).lower()
+        ammo = weapon.DefinitionData.WeaponTypeDefinition.AmmoResource
     except Exception:
         return None
-
-    for part in ("bsg_", "weapontype_"):
-        if name.startswith(part):
-            name = name[len(part):]
-    if name.endswith("_stock"):
-        name = name[: -len("_stock")]
-    return name or None
+    if ammo is None:
+        return "no ammo"
+    try:
+        return str(ammo.Name)
+    except Exception:
+        return None
 
 
 def mark(score: float, best: float | None) -> str:
     """How this gun stands against the best of its group, as one coloured sign."""
+    # Nothing else you carry is in this group, so this one is your best there.
     if best is None:
-        return f'<font color="{GREY}">?</font>'
-    if score > best * (1 + CLOSE_ENOUGH):
         return f'<font color="{BETTER}">+</font>'
-    if score < best * (1 - CLOSE_ENOUGH):
+    # Compared as the whole numbers printed on the cards, so = means the two cards
+    # show exactly the same score.
+    mine = round(score)
+    theirs = round(best)
+    if mine > theirs:
+        return f'<font color="{BETTER}">+</font>'
+    if mine < theirs:
         return f'<font color="{WORSE}">-</font>'
     return f'<font color="{SAME}">=</font>'
 
@@ -562,7 +565,13 @@ def comparison_line(weapon: UObject, score: float) -> str | None:
     # The card squeezes a run of spaces down to one, so the gap between groups is
     # held open with spaces that do not squeeze, and each mark is kept tight to its
     # own label. One ordinary space stays in each gap so a long line can still wrap.
-    parts = [f"{name}&nbsp;{mark(score, best)}" for name, best in bests.items()]
+    # A gun with no element is compared with the other guns that have none, and
+    # says so. The two words are held together so a long line never splits them.
+    labels = {"Element": "Element" if element is not None else "No&nbsp;Elem"}
+    parts = [
+        f"{labels.get(name, name)}&nbsp;{mark(score, best)}"
+        for name, best in bests.items()
+    ]
     return "&nbsp; ".join(parts)
 
 
@@ -851,12 +860,12 @@ pool_time = 0.0
 
 
 def item_score(item: UObject) -> float:
-    """How good a thing is, so the best sits at the top of the list."""
+    """A gun's DPS, so the best sits at the top of the DPS page.
+
+    Only guns have a DPS, so shields and everything else go below them.
+    """
     if is_weapon(item):
         score = get_dps(None, "", item)
-        return 0.0 if score is None else score
-    if is_shield(item):
-        score = get_shield_score(item)
         return 0.0 if score is None else score
     return 0.0
 

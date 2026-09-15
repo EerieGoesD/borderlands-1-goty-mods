@@ -1,6 +1,6 @@
 [project]
 name = "GearScore"
-version = "1.1.0"
+version = "1.1.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Rates every weapon by DPS and shield by Shield Power according to in-game formula, on item cards wherever you see it (character skills not counted).
 

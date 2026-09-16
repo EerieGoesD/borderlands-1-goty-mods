@@ -6,6 +6,7 @@ Anything within reach is collected as you walk past.
 
 ## Settings
 
+- **Loot Gear You Cannot Use**: Weapons and items your character cannot use yet, such as class mods for another character.
 - **Reach in metres**: How close the loot has to be.
 - **Checks per second**: How often loot around you is looked for. Lower is better for performance.
 - **Loot Weapons**: Weapons and items.

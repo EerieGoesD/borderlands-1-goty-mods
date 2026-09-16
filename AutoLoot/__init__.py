@@ -27,6 +27,17 @@ LootAmmo = BoolOption("Loot Ammo", True, "Yes", "No")
 LootHealth = BoolOption("Loot Health", True, "Yes", "No")
 LootMoney = BoolOption("Loot Money", True, "Yes", "No")
 LootWeapons = BoolOption("Loot Weapons", True, "Yes", "No")
+LootUnusable = BoolOption(
+    "Loot Gear You Cannot Use",
+    True,
+    "Yes",
+    "No",
+    description=(
+        "Picks up weapons and items that your character cannot use yet, such as class"
+        " mods for another character or gear above your level. They go in the backpack"
+        " the same as anything else."
+    ),
+)
 
 # When loot was last looked for, so the slider means seconds whatever the frame rate.
 last_look = 0.0
@@ -126,9 +137,11 @@ def on_render(
                 continue
 
             # Ammo, money and health you are already full up on are left alone,
-            # asked the way the game asks it.
-            if pickup.Inventory.CanBeUsedBy(me) is not True:
-                continue
+            # asked the way the game asks it. The same question turns down gear your
+            # character cannot use, which is only asked when the setting says to.
+            if kind != "gear" or LootUnusable.value is not True:
+                if pickup.Inventory.CanBeUsedBy(me) is not True:
+                    continue
 
             # The game's own pick up, the same as pressing the key on it. Taking
             # the item straight out of the pickup left an empty husk behind that
@@ -146,7 +159,15 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[LootWeapons, LootMoney, LootAmmo, LootHealth, Reach, ChecksPerSecond],
+    options=[
+        LootWeapons,
+        LootMoney,
+        LootAmmo,
+        LootHealth,
+        LootUnusable,
+        Reach,
+        ChecksPerSecond,
+    ],
     keybinds=[],
     hooks=[on_render],
     commands=[],

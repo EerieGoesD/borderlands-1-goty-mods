@@ -4,7 +4,7 @@ Removes recoil from all weapons.
 
 ## Settings
 
-- **Also Stop Spread**: every shot lands dead centre instead of scattering around the crosshair.
+- **Stop Spread**: every shot lands dead centre instead of scattering around the crosshair. The gun's own wide crosshair is swapped for a small one in the middle of the screen.
 
 ## Install
 

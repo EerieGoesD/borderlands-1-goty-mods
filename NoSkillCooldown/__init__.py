@@ -51,6 +51,10 @@ def on_start(
             return
         if float(obj.ActionSkillTime) < 0.0:
             return
+        # A skill the key can switch off is left to the game, which ends it on this
+        # press. The wait never starts, so it is ready again straight away.
+        if obj.PlayerSkills[number].Definition.bCanBeToggledOff is True:
+            return
     except Exception:
         return
 

@@ -2,7 +2,7 @@
 
 Your action skill is ready every time you press the key.
 
-Pressing the key while your action skill is active ends it and starts it again.
+Pressing the key while your action skill is active restarts it, or ends it if the key can switch it off.
 
 ## Install
 

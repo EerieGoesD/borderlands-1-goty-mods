@@ -1,4 +1,5 @@
 import math
+import time
 from pathlib import Path
 
 import unrealsdk  # type: ignore
@@ -16,8 +17,9 @@ FEET_PER_METRE = 3.28084
 
 TEXT_SCALE = 0.6
 
-# Frames between sweeps of the area.
-REFRESH_FRAMES = 60
+# The longest wait between looks at the area, in seconds. Only the full scan waits
+# for the setting, so a change of area is still noticed within a second.
+TICK_SECONDS = 1.0
 
 # How often we check whether a shop screen is up, in frames.
 SHOP_FRAMES = 10
@@ -59,8 +61,19 @@ BetterOnly = BoolOption("Display Only Better Weapons", False, "Yes", "No")
 HideFull = BoolOption("Hide Full Pickups", True, "On", "Off")
 ShowDistance = BoolOption("Show Distance", True, "Yes", "No")
 Units = SpinnerOption("Units", value="Metres", choices=["Metres", "Feet"], wrap_enabled=True)
+# Each scan walks every pickup and chest in the area, so more often shows as stutter.
+ChecksPerSecond = SliderOption(
+    "Checks per second",
+    1.0,
+    0.1,
+    10.0,
+    0.1,
+    False,
+    description="How often loot and chests around you are looked for. Lower is better for performance.",
+)
 
-frames = REFRESH_FRAMES
+next_tick = 0.0
+scanned_at = 0.0
 
 # Whether a shop screen is up, asked now and then rather than every frame.
 shop_open = False
@@ -443,9 +456,9 @@ waiting_marks: list = []
 # What each pickup turned out to be, so its name is only read once.
 kinds: dict[UObject, str] = {}
 
-# How many sweeps to sit out while a new area is being swapped in.
-SETTLE_SWEEPS = 4
-settling = 0
+# How long to sit out, in seconds, while a new area is being swapped in.
+SETTLE_SECONDS = 5.0
+settle_until = 0.0
 last_area = ""
 
 
@@ -506,7 +519,7 @@ def sweep() -> None:
 
     The same pass also keeps ammo you cannot carry from lighting up.
     """
-    global marks, last_area, settling, chest_list, chest_frames
+    global marks, last_area, settle_until, chest_list, chest_frames, scanned_at
 
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -522,18 +535,24 @@ def sweep() -> None:
 
     if here != last_area:
         last_area = here
-        settling = SETTLE_SWEEPS
+        settle_until = time.monotonic() + SETTLE_SECONDS
         chest_list = []
         chest_frames = 0
         kinds.clear()
         hidden.clear()
         marks = []
+        scanned_at = 0.0
         return
 
-    if settling > 0:
-        settling -= 1
+    now = time.monotonic()
+    if now < settle_until:
         marks = []
         return
+
+    gap = 1.0 / max(float(ChecksPerSecond.value), 0.1)
+    if now - scanned_at < gap - min(0.1, gap / 10):
+        return
+    scanned_at = now
 
     found = find_chests()
 
@@ -643,7 +662,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, gear, black, shop_open, shop_frames, marks
+    global next_tick, gear, black, shop_open, shop_frames, marks
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or pc.myHUD is None:
@@ -653,9 +672,9 @@ def on_render(
     if canvas is None:
         return
 
-    frames += 1
-    if frames >= REFRESH_FRAMES:
-        frames = 0
+    now = time.monotonic()
+    if now >= next_tick:
+        next_tick = now + min(TICK_SECONDS, 1.0 / max(float(ChecksPerSecond.value), 0.1))
         sweep()
 
     if not marks:
@@ -793,6 +812,7 @@ build_mod(
         ShowDistance,
         Units,
         HideFull,
+        ChecksPerSecond,
     ],
     keybinds=[],
     hooks=[on_render, on_spawn_particles, on_pick_up],

@@ -1,4 +1,5 @@
 import math
+import time
 from pathlib import Path
 
 import unrealsdk  # type: ignore
@@ -7,7 +8,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
-from mods_base.options import BoolOption, SpinnerOption
+from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
 FONT = "ui_fonts.font_willowbody_18pt"
 
@@ -18,12 +19,9 @@ FEET_PER_METRE = 3.28084
 TEXT_SCALE = 1.0
 COLOUR = (255, 210, 0)
 
-# Frames between recalculations.
-REFRESH_FRAMES = 60
-
-# The route is worked out midway between two readings, so the two never land on the
-# same frame and neither is felt.
-ROUTE_ON_FRAME = 30
+# The longest wait between looks at the area, in seconds. Only the full check waits
+# for the setting, so a change of area is still noticed within a second.
+TICK_SECONDS = 1.0
 
 ShowDistance = BoolOption("Show Distance", True, "On", "Off")
 ShowRoute = BoolOption("Show Route Line", True, "On", "Off")
@@ -39,6 +37,16 @@ RouteColour = SpinnerOption(
     value="Green",
     choices=["Green", "Blue", "Red", "Yellow", "Orange"],
     wrap_enabled=True,
+)
+# Each check looks the objective up across the area, so more often shows as stutter.
+ChecksPerSecond = SliderOption(
+    "Checks per second",
+    1.0,
+    0.1,
+    10.0,
+    0.1,
+    False,
+    description="How often the distance and route line are worked out. Lower is better for performance.",
 )
 
 # The bright core and the halo around it, for each choice.
@@ -95,7 +103,9 @@ EYE_LIFT = 60.0
 # part of it, so anything that makes real headway is worth walking.
 DEAD_END_SHARE = 0.98
 
-frames = REFRESH_FRAMES
+next_tick = 0.0
+checked_at = 0.0
+route_at: float | None = None
 cached_text = ""
 cached_target = None
 
@@ -168,9 +178,9 @@ def distance_to(here, there) -> float | None:
     return (dx * dx + dy * dy + dz * dz) ** 0.5
 
 
-# How many checks to sit out while an area is being swapped in, at one a second.
-SETTLE_CHECKS = 3
-settling = 0
+# How long to sit out, in seconds, while an area is being swapped in.
+SETTLE_SECONDS = 3.0
+settle_until = 0.0
 
 candidates: list[UObject] = []
 turn_ins: list[UObject] = []
@@ -436,7 +446,7 @@ def waypoint_distance() -> float | None:
     While the objective sits in another area the compass points at the way out, so the
     nearest of the mission's own waypoint and the exit is the one that counts.
     """
-    global cached_target, settling
+    global cached_target, settle_until
 
     try:
         mission = mission_tracker().ActiveMission
@@ -450,14 +460,16 @@ def waypoint_distance() -> float | None:
         # A new area is still being swapped in, and the one you left is being taken
         # apart piece by piece. Asking any of it anything takes the game down, so
         # nothing is read until it has settled.
-        if settling < SETTLE_CHECKS:
-            settling += 1
+        now = time.monotonic()
+        if settle_until == 0.0:
+            settle_until = now + SETTLE_SECONDS
+        if now < settle_until:
             cached_target = None
             return None
-        settling = 0
+        settle_until = 0.0
         build_graph(live)
     else:
-        settling = 0
+        settle_until = 0.0
 
     # The map screen's own waypoint marker is the answer whenever it has one.
     spot = map_waypoint(live)
@@ -1155,14 +1167,30 @@ def on_render(
     if canvas is None:
         return
 
-    global frames, cached_text
+    global next_tick, checked_at, route_at, cached_text
 
-    frames += 1
-    if frames >= REFRESH_FRAMES:
-        frames = 0
-        cached_text = build_text()
-    elif frames == ROUTE_ON_FRAME and ShowRoute.value is True:
-        refresh_route(pc.Pawn.Location)
+    now = time.monotonic()
+    gap = 1.0 / max(float(ChecksPerSecond.value), 0.1)
+    checked = False
+    if now >= next_tick:
+        next_tick = now + min(TICK_SECONDS, gap)
+        # A change of area is looked at every second whatever the setting, so it
+        # still gets its time to settle in.
+        if (
+            now - checked_at >= gap - min(0.1, gap / 10)
+            or frozenset(loaded_levels()) != graph_levels
+        ):
+            checked_at = now
+            # The route is worked out midway between two readings, so the two never
+            # land on the same frame and neither is felt.
+            route_at = now + gap / 2
+            cached_text = build_text()
+            checked = True
+
+    if not checked and route_at is not None and now >= route_at:
+        route_at = None
+        if ShowRoute.value is True:
+            refresh_route(pc.Pawn.Location)
 
     if ShowRoute.value is True:
         try:
@@ -1199,7 +1227,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[ShowDistance, ShowRoute, Units, Position, RouteColour],
+    options=[ShowDistance, ShowRoute, Units, Position, RouteColour, ChecksPerSecond],
     keybinds=[],
     hooks=[on_render],
     commands=[],

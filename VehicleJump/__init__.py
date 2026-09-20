@@ -17,8 +17,22 @@ FONT = "ui_fonts.font_willowbody_18pt"
 READING_LEFT = 30
 READING_TOP = 120
 
+def on_reading_picked(_option, value) -> None:
+    """The reading needs watching every frame, a jump only while it lasts."""
+    if value is True:
+        watch()
+    elif took_off is None:
+        rest()
+
+
 JumpHeight = SliderOption("Jump Height", 800, 200, 10000, 10, True)
-ShowJump = BoolOption("Show jump height [DEBUG]", False, "Yes", "No")
+ShowJump = BoolOption(
+    "Show jump height [DEBUG]",
+    False,
+    "Yes",
+    "No",
+    on_change_anytime=on_reading_picked,
+)
 
 # Push squared per unit of height. The starting number is only a first guess; every
 # jump measures the real one and corrects it.
@@ -54,6 +68,23 @@ stock_top_speed = None
 
 # True once the wheels have actually left the ground on this jump.
 in_the_air = False
+
+
+def watch() -> None:
+    """Starts looking at every frame, for as long as there is something to see."""
+    try:
+        if on_render.get_active_count() == 0:
+            on_render.enable()
+    except Exception as ex:
+        logging.dev_warning(f"[Vehicle Jump] could not start watching ({ex})")
+
+
+def rest() -> None:
+    """Stops looking at every frame, so nothing is spent between jumps."""
+    try:
+        on_render.disable()
+    except Exception as ex:
+        logging.dev_warning(f"[Vehicle Jump] could not stop watching ({ex})")
 
 
 def in_a_vehicle(pawn) -> bool:
@@ -105,6 +136,9 @@ def on_jump() -> None:
         took_off = float(pc.Pawn.Location.Z)
         peak = took_off
         in_the_air = False
+
+        # Nothing to watch until now, so this is where the watching starts.
+        watch()
     except Exception as ex:
         logging.dev_warning(f"[Vehicle Jump] could not jump ({ex})")
 
@@ -121,6 +155,9 @@ def on_render(
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or not in_a_vehicle(pc.Pawn):
+        # Out of the car with no jump in the air, so there is nothing left to see.
+        if took_off is None and ShowJump.value is not True:
+            rest()
         return
 
     try:
@@ -147,6 +184,10 @@ def on_render(
                 if stock_top_speed is not None:
                     pc.Pawn.MaxSpeed = stock_top_speed
                     stock_top_speed = None
+
+                # Back on the ground, so there is nothing to watch again.
+                if ShowJump.value is not True:
+                    rest()
     except Exception as ex:
         logging.dev_warning(f"[Vehicle Jump] could not measure the jump ({ex})")
         return
@@ -185,6 +226,10 @@ def on_enable() -> None:
     took_off = None
     in_the_air = False
     push_per_height = 5920.0
+
+    # Sitting still costs nothing: the watching only starts with a jump.
+    if ShowJump.value is not True:
+        rest()
 
 
 def on_disable() -> None:

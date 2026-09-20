@@ -29,6 +29,8 @@ The distance to each mark is written above it.
 - **Hide Full Pickups**: Ammo and health you cannot carry stops lighting up.
 - **Show Distance**: How far away each mark is, written above it.
 - **Units**: Metres or feet.
+- **Checks per second**: How often loot and chests around you are looked for. Lower is
+  better for performance.
 
 ## Install
 

@@ -21,8 +21,8 @@ TEXT_SCALE = 0.6
 # for the setting, so a change of area is still noticed within a second.
 TICK_SECONDS = 1.0
 
-# How often we check whether a shop screen is up, in frames.
-SHOP_FRAMES = 10
+# How often we check whether a shop screen is up, in seconds.
+SHOP_SECONDS = 0.5
 
 # The compass bar, measured as a share of the screen.
 # Enhanced draws its bar lower down than the original does.
@@ -39,6 +39,17 @@ MARK_LIFT = 14
 MARK_HEIGHT = 8
 MARK_SIZE = 5
 BANG_HEIGHT = 18
+
+# Marks closer together than this on the bar sit on top of each other, so only the
+# nearest of them is drawn. Drawing is what a crowded area costs.
+MARK_APART = 10
+
+# The mark is a character rather than a shape built out of lines, since every line
+# is a separate order to the graphics card and a busy area holds plenty of marks.
+BANG_TEXT = "!"
+BANG_SCALE = 1.2
+BANG_NUDGE = 4
+BANG_TOP = 26
 
 GEAR_COLOUR = (120, 255, 140)
 SUPPLY_COLOUR = (90, 180, 255)
@@ -77,7 +88,7 @@ scanned_at = 0.0
 
 # Whether a shop screen is up, asked now and then rather than every frame.
 shop_open = False
-shop_frames = SHOP_FRAMES
+shop_asked = 0.0
 
 marks: list[tuple[tuple[float, float, float], bool]] = []
 hidden: set[UObject] = set()
@@ -335,8 +346,16 @@ def bang_shape(canvas, x: int, y: int, colour, grow: int) -> None:
 
 def bang(canvas, x: int, y: int, colour) -> None:
     """The mark itself, on a black edge so it shows against anything."""
-    bang_shape(canvas, x, y, black, 1)
-    bang_shape(canvas, x, y, colour, 0)
+    global font
+
+    if font is None:
+        font = unrealsdk.find_object("Font", FONT)
+
+    canvas.Font = font
+
+    canvas.DrawColor = colour
+    canvas.SetPos(x - BANG_NUDGE, y - BANG_TOP)
+    canvas.DrawText(BANG_TEXT, False, BANG_SCALE, BANG_SCALE)
 
 
 def label(canvas, x: float, y: float, text: str, colour) -> None:
@@ -347,11 +366,6 @@ def label(canvas, x: float, y: float, text: str, colour) -> None:
         font = unrealsdk.find_object("Font", FONT)
 
     canvas.Font = font
-
-    canvas.DrawColor = black
-    for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-        canvas.SetPos(x + dx, y + dy)
-        canvas.DrawText(text, False, TEXT_SCALE, TEXT_SCALE)
 
     canvas.DrawColor = colour
     canvas.SetPos(x, y)
@@ -644,14 +658,9 @@ def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
                 continue
 
 
-def bearing_to(here, x: float, y: float) -> float:
+def bearing_to(hx: float, hy: float, facing: float, x: float, y: float) -> float:
     """How far left or right of where you are looking the spot sits, in degrees."""
-    try:
-        angle = math.degrees(math.atan2(y - float(here.Y), x - float(here.X)))
-        facing = float(get_pc().Rotation.Yaw) * 360.0 / 65536.0
-    except Exception:
-        return 999.0
-
+    angle = math.degrees(math.atan2(y - hy, x - hx))
     return (angle - facing + 180.0) % 360.0 - 180.0
 
 
@@ -662,7 +671,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global next_tick, gear, black, shop_open, shop_frames, marks
+    global next_tick, gear, black, shop_open, shop_asked, marks, font
 
     pc = get_pc()
     if pc is None or pc.Pawn is None or pc.myHUD is None:
@@ -687,9 +696,8 @@ def on_render(
 
         # A shop screen counts too. Asking the game which screen it is playing every
         # frame is too slow, so it is asked now and then and only the answer is kept.
-        shop_frames += 1
-        if shop_frames >= SHOP_FRAMES:
-            shop_frames = 0
+        if now - shop_asked >= SHOP_SECONDS:
+            shop_asked = now
             shop_open = False
             for manager in unrealsdk.find_all("WillowGFxUIManager"):
                 try:
@@ -755,13 +763,21 @@ def on_render(
 
     try:
         here = pc.Pawn.Location
+        hx = float(here.X)
+        hy = float(here.Y)
+        hz = float(here.Z)
+        facing = float(pc.Rotation.Yaw) * 360.0 / 65536.0
         bottom = canvas.SizeY * COMPASS_TOP - MARK_LIFT
         top = bottom - MARK_HEIGHT
 
         middle = int((top + bottom) / 2)
 
+        # Whatever sits on the same stretch of the bar is one mark, the nearest of
+        # them, since they would be drawn on top of each other anyway.
+        nearest: dict[int, tuple[int, float, str]] = {}
+
         for (x, y, z), kind in marks:
-            offset = bearing_to(here, x, y)
+            offset = bearing_to(hx, hy, facing, x, y)
             if offset > COMPASS_ARC or offset < -COMPASS_ARC:
                 continue
 
@@ -769,29 +785,46 @@ def on_render(
                 canvas.SizeX
                 * (COMPASS_CENTRE + COMPASS_HALF_WIDTH * offset / COMPASS_ARC),
             )
-            colour = colours.get(kind, gear)
+            gap = ((x - hx) ** 2 + (y - hy) ** 2 + (z - hz) ** 2) ** 0.5
 
-            bang(canvas, across, middle, colour)
+            slot = across // MARK_APART
+            standing = nearest.get(slot)
+            if standing is None or gap < standing[1]:
+                nearest[slot] = (across, gap, kind)
 
-            if ShowDistance.value is True:
-                gap = (
-                    (x - float(here.X)) ** 2
-                    + (y - float(here.Y)) ** 2
-                    + (z - float(here.Z)) ** 2
-                ) ** 0.5
+        # Everything of the same colour is drawn together, since handing the game a
+        # colour costs as much as the drawing itself.
+        together: dict[str, list[tuple[int, float]]] = {}
+        for across, gap, kind in nearest.values():
+            together.setdefault(kind, []).append((across, gap))
+
+        # Asking the game for a command costs more than the command does, so both
+        # are asked for once and used for the whole lot.
+        if font is None:
+            font = unrealsdk.find_object("Font", FONT)
+        set_pos = canvas.SetPos
+        draw_text = canvas.DrawText
+        canvas.Font = font
+
+        showing = ShowDistance.value is True
+        feet = Units.value == "Feet"
+        mark_top = middle - BANG_TOP
+        text_top = middle - BANG_HEIGHT - 18
+
+        for kind, spots in together.items():
+            canvas.DrawColor = colours.get(kind, gear)
+
+            for across, gap in spots:
+                set_pos(across - BANG_NUDGE, mark_top)
+                draw_text(BANG_TEXT, False, BANG_SCALE, BANG_SCALE)
+
+                if not showing:
+                    continue
+
                 metres = gap / UNITS_PER_METRE
-                if Units.value == "Feet":
-                    text = f"{round(metres * FEET_PER_METRE)}"
-                else:
-                    text = f"{round(metres)}"
-
-                label(
-                    canvas,
-                    across - len(text) * 4,
-                    middle - BANG_HEIGHT - 18,
-                    text,
-                    colour,
-                )
+                text = f"{round(metres * FEET_PER_METRE)}" if feet else f"{round(metres)}"
+                set_pos(across - len(text) * 4, text_top)
+                draw_text(text, False, TEXT_SCALE, TEXT_SCALE)
     except Exception as ex:
         logging.dev_warning(f"[Loot Radar] could not draw ({ex})")
 

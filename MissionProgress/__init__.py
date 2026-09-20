@@ -1,3 +1,4 @@
+import time
 from pathlib import Path
 
 import unrealsdk  # type: ignore
@@ -56,11 +57,11 @@ RISKY_MISSIONS = {
 }
 WARNING_TEXT = "Careful! Possible missable/glitched achievement"
 
-# How often the panel and the mission lookup refresh, in frames.
-REFRESH_FRAMES = 300
+# How often the panel and the mission lookup refresh, in seconds.
+REFRESH_SECONDS = 5.0
 
-# How often we check whether a shop screen is up, in frames.
-SHOP_FRAMES = 10
+# How often we check whether a shop screen is up, in seconds.
+SHOP_SECONDS = 0.5
 
 Position = SpinnerOption(
     "Position",
@@ -76,7 +77,7 @@ EnableSide = BoolOption("Enable Side Missions", True, "Yes", "No")
 
 definitions: dict[str, UObject] = {}
 
-frames = REFRESH_FRAMES
+next_build = 0.0
 cached_lines: list[tuple[str, tuple[int, int, int]]] = []
 trimmed_lines = None
 
@@ -84,7 +85,7 @@ trimmed_lines = None
 # answer is kept, never the screens themselves, since those belong to the area you
 # are in and asking one of them anything after you leave takes the game down.
 shop_open = False
-shop_frames = SHOP_FRAMES
+shop_asked = 0.0
 
 # Whether a menu was up last frame.
 menu_was_open = False
@@ -234,7 +235,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, cached_lines, trimmed_lines, shop_open, shop_frames, menu_was_open
+    global next_build, cached_lines, trimmed_lines, shop_open, shop_asked, menu_was_open
 
     pc = get_pc()
     if pc is None or pc.myHUD is None:
@@ -254,13 +255,13 @@ def on_render(
         # picking a different mission shows up at once.
         if menu_was_open:
             menu_was_open = False
-            frames = REFRESH_FRAMES
+            next_build = 0.0
 
         # A shop screen counts too. Asking the game which screen it is playing every
         # frame is too slow, so it is asked now and then and only the answer is kept.
-        shop_frames += 1
-        if shop_frames >= SHOP_FRAMES:
-            shop_frames = 0
+        now = time.monotonic()
+        if now - shop_asked >= SHOP_SECONDS:
+            shop_asked = now
             shop_open = False
             for manager in unrealsdk.find_all("WillowGFxUIManager"):
                 try:
@@ -282,9 +283,9 @@ def on_render(
     if canvas is None:
         return
 
-    frames += 1
-    if frames >= REFRESH_FRAMES:
-        frames = 0
+    now = time.monotonic()
+    if now >= next_build:
+        next_build = now + REFRESH_SECONDS
         find_definitions()
         fresh = build_lines()
         if fresh != cached_lines:
@@ -341,21 +342,36 @@ def on_render(
         # still costs, so the list stops where the screen does.
         bottom = float(canvas.SizeY) - LINE_HEIGHT
 
+        # Asking the game for a command costs more than the command does, so both
+        # are asked for once and used for the whole panel.
+        set_pos = canvas.SetPos
+        draw_text = canvas.DrawText
+
+        showing = []
         for line, colour in trimmed_lines:
             if y > bottom:
                 break
-
-            # A black pass all the way round first, so the words stand out against
-            # whatever is behind them.
-            canvas.DrawColor = colours[BLACK]
-            for across, down in OUTLINE_STEPS:
-                canvas.SetPos(left + across, y + down)
-                canvas.DrawText(line, False, TEXT_SCALE, TEXT_SCALE)
-
-            canvas.DrawColor = colours[colour]
-            canvas.SetPos(left, y)
-            canvas.DrawText(line, False, TEXT_SCALE, TEXT_SCALE)
+            showing.append((line, colour, y))
             y += LINE_HEIGHT
+
+        # A black pass all the way round first, so the words stand out against
+        # whatever is behind them. Every line of it under the one colour, since
+        # handing the game a colour costs as much as the drawing does.
+        canvas.DrawColor = colours[BLACK]
+        for line, _colour, at in showing:
+            for across, down in OUTLINE_STEPS:
+                set_pos(left + across, at + down)
+                draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
+
+        together: dict[tuple[int, int, int], list] = {}
+        for line, colour, at in showing:
+            together.setdefault(colour, []).append((line, at))
+
+        for colour, rows in together.items():
+            canvas.DrawColor = colours[colour]
+            for line, at in rows:
+                set_pos(left, at)
+                draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
     except Exception as ex:
         logging.dev_warning(f"[Mission Progress] could not draw ({ex})")
 

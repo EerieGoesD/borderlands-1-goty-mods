@@ -27,6 +27,38 @@ def pretty(name: str) -> str:
     return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", name)
 
 
+# Spots whose own title reads badly, or is shared with another spot so that one
+# would hide the other. The game's own title is used for everything else.
+BETTER_NAMES = {
+    "UpperSeeps": "Upper Seeps",
+    "Checkpoint_swamp_ned": "Hallow's End",
+    "Thor_Digger": "Thor Digger",
+    "BossElevatorEntrance": "Saw Mill Elevator",
+    "SewerArena": "The Cesspool Arena",
+    "Thor_Trash": "The Salt Flats - Thor",
+    "Thor_TheDescent": "The Descent - Thor",
+    "AridHillsEntrance": "Arid Hills Entrance",
+}
+
+
+def titles() -> dict[str, str]:
+    """What the game itself calls each of its travel spots."""
+    found: dict[str, str] = {}
+
+    for spot in unrealsdk.find_all("TeleportOutpostLookupObject"):
+        try:
+            if str(spot.Name).startswith("Default__"):
+                continue
+            raw = str(spot.OutpostName)
+            shown = str(spot.OutpostDisplayName)
+        except Exception:
+            continue
+        if raw and shown:
+            found[raw] = shown
+
+    return found
+
+
 def gather() -> list[str]:
     """Every place you have been to in this playthrough."""
     places.clear()
@@ -40,10 +72,24 @@ def gather() -> list[str]:
     except Exception:
         return [NOTHING]
 
+    known = titles()
+
     for spot in been:
         name = str(spot)
-        if name:
-            places[pretty(name)] = name
+        if not name:
+            continue
+
+        shown = BETTER_NAMES.get(name) or known.get(name) or pretty(name)
+
+        # Two spots can carry the same title, and one would otherwise swallow the
+        # other, so the later ones are numbered.
+        if shown in places:
+            number = 2
+            while f"{shown} {number}" in places:
+                number += 1
+            shown = f"{shown} {number}"
+
+        places[shown] = name
 
     return sorted(places) or [NOTHING]
 

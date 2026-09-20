@@ -3,6 +3,8 @@ import time
 import traceback
 from pathlib import Path
 
+import unrealsdk  # type: ignore
+
 from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
@@ -78,10 +80,45 @@ WhereIsIt = ButtonOption(
     description_title="Where the note is saved",
 )
 WrapMods = BoolOption("Follow Other Mods", True, "Yes", "No")
+ShowCost = BoolOption(
+    "Show What Each Mod Costs",
+    False,
+    "On",
+    "Off",
+    description="Puts a list on screen of how long each mod takes every frame."
+    " Needs Follow Other Mods on.",
+)
+CostWhere = SpinnerOption(
+    "Position",
+    value="Top left",
+    choices=["Top left", "Top right", "Top centre"],
+    wrap_enabled=True,
+    description="Where the list of what each mod costs sits on screen.",
+)
 KeepSlots = SliderOption("Lines Kept", SLOTS, 32, 512, 32, True)
 
 log_file: int | None = None
 written = 0
+
+# How long each mod has taken since the list was last worked out, and how much of
+# the clock that stretch covered.
+COST_WINDOW = 0.5
+COST_FONT = "ui_fonts.font_willowbody_18pt"
+COST_TOP = 200
+COST_LINE = 24
+
+# How wide the list is taken to be, and how far it keeps from the screen edge.
+COST_WIDTH = 420
+COST_MARGIN = 30
+
+spent: dict[str, float] = {}
+cost_lines: list[str] = []
+window_frames = 0
+window_time = 0.0
+last_frame = 0.0
+cost_font = None
+cost_white = None
+cost_black = None
 
 # Where the newest line sits, so its mark can be wiped when the next one lands.
 last_slot: int | None = None
@@ -186,11 +223,15 @@ def follow(mod_name: str, hook_name: str, inner):
         func: BoundFunction,
     ):
         note(f"{mod_name} -> {hook_name}")
+        # Only the mod's own work is timed, never the note keeping around it.
+        began = time.perf_counter() if ShowCost.value is True else None
         try:
             answer = inner(obj, args, ret, func)
         except Exception:
             note(f"{mod_name} !! {hook_name} {traceback.format_exc(limit=1).strip()}")
             raise
+        if began is not None:
+            spent[mod_name] = spent.get(mod_name, 0.0) + (time.perf_counter() - began)
         note(f"{mod_name} <- {hook_name}")
         return answer
 
@@ -237,6 +278,64 @@ def unwatch_mods() -> None:
     wrapped.clear()
 
 
+def draw_costs(canvas) -> None:
+    """Works out what each mod is costing, and puts the list on screen."""
+    global window_frames, window_time, last_frame, cost_lines
+    global cost_font, cost_white, cost_black
+
+    now = time.perf_counter()
+    if last_frame > 0.0:
+        window_time += now - last_frame
+        window_frames += 1
+    last_frame = now
+
+    if window_time >= COST_WINDOW and window_frames > 0:
+        frame_ms = window_time / window_frames * 1000.0
+        fresh = [f"Frame {frame_ms:.1f} ms"]
+        for name, took in sorted(spent.items(), key=lambda pair: -pair[1]):
+            each = took / window_frames * 1000.0
+            share = took / window_time * 100.0
+            fresh.append(f"{name}   {each:.2f} ms   {share:.0f}%")
+        if len(fresh) == 1:
+            fresh.append("Nothing measured. Turn Follow Other Mods on.")
+        cost_lines = fresh
+        spent.clear()
+        window_frames = 0
+        window_time = 0.0
+
+    if canvas is None or not cost_lines:
+        return
+
+    try:
+        if cost_font is None:
+            cost_font = unrealsdk.find_object("Font", COST_FONT)
+            cost_white = unrealsdk.make_struct("Color", R=255, G=255, B=255, A=255)
+            cost_black = unrealsdk.make_struct("Color", R=0, G=0, B=0, A=255)
+
+        canvas.Font = cost_font
+
+        where = CostWhere.value
+        if where == "Top right":
+            left = canvas.SizeX - COST_WIDTH - COST_MARGIN
+        elif where == "Top centre":
+            left = (canvas.SizeX - COST_WIDTH) / 2
+        else:
+            left = COST_MARGIN
+
+        y = COST_TOP
+        for line in cost_lines:
+            canvas.DrawColor = cost_black
+            canvas.SetPos(left + 1, y + 1)
+            canvas.DrawText(line, False, 1.0, 1.0)
+
+            canvas.DrawColor = cost_white
+            canvas.SetPos(left, y)
+            canvas.DrawText(line, False, 1.0, 1.0)
+            y += COST_LINE
+    except Exception as ex:
+        logging.dev_warning(f"[Crash Debug] could not draw the costs ({ex})")
+
+
 def area_name() -> str:
     try:
         return str(get_pc().WorldInfo.GetMapName(True))
@@ -251,7 +350,12 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    global frames, last_area
+    global frames, last_area, last_frame
+
+    if ShowCost.value is True:
+        draw_costs(__args.Canvas)
+    else:
+        last_frame = 0.0
 
     frames += 1
     if frames < RESCAN_FRAMES:
@@ -274,6 +378,14 @@ def on_enable() -> None:
 
 
 def on_disable() -> None:
+    global cost_lines, window_frames, window_time, last_frame
+
+    spent.clear()
+    cost_lines = []
+    window_frames = 0
+    window_time = 0.0
+    last_frame = 0.0
+
     unwatch_mods()
     note("Crash Debug stopped")
     stop_log()
@@ -284,7 +396,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[SaveTo, FileEnding, WhereIsIt, WrapMods, KeepSlots],
+    options=[SaveTo, FileEnding, WhereIsIt, WrapMods, KeepSlots, ShowCost, CostWhere],
     keybinds=[],
     hooks=[on_render],
     commands=[],

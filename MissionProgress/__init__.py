@@ -31,9 +31,6 @@ TEXT_SCALE = 1.0
 # How far the panel keeps clear of the screen edge.
 PANEL_MARGIN = 20
 
-# Longest line that fits the panel, anything past this is cut short.
-MAX_CHARS = 46
-
 WHITE = (255, 255, 255)
 GOLD = (255, 210, 0)
 GREY = (150, 150, 150)
@@ -161,7 +158,7 @@ def tracked_name() -> str | None:
         return None
 
 
-def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
+def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     if EnableDLC.value is True:
         flow = WITH_DLC if EnableSide.value is True else WITH_DLC_MAIN
     else:
@@ -175,15 +172,16 @@ def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
     done = [name for name in flow.flat if is_complete(name)]
     percent = round(100 * len(done) / len(flow.flat)) if flow.flat else 0
 
-    lines: list[tuple[str, tuple[int, int, int]]] = [
-        (f"Progress  {percent}%   {len(done)}/{len(flow.flat)}", BLUE),
+    lines: list[tuple[str, tuple[int, int, int], bool]] = [
+        (f"Progress  {percent}%   {len(done)}/{len(flow.flat)}", BLUE, False),
     ]
 
+    def risky(name: str) -> bool:
+        """Whether the warning goes on this mission's row."""
+        return ShowWarnings.value is True and name in RISKY_MISSIONS
+
     def label(marker: str, name: str) -> str:
-        text = f"{marker}  {flow.kind[name]} - {name}"
-        if len(text) > MAX_CHARS:
-            text = text[: MAX_CHARS - 3] + "..."
-        return text
+        return f"{marker}  {flow.kind[name]} - {name}"
 
     current = next(
         (i for i, name in enumerate(flow.main) if not is_complete(name)),
@@ -193,7 +191,7 @@ def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
     # Whatever you picked in the mission log is the one you are on.
     tracked = tracked_name()
     if tracked is not None and tracked in flow.kind:
-        lines.append((label(">", tracked), GOLD))
+        lines.append((label(">", tracked), GOLD, risky(tracked)))
 
     # Where you are in the timeline: the mission you are on, else the next main one.
     if tracked is not None and tracked in flow.position:
@@ -207,12 +205,9 @@ def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
     if ShowSkipped.value is True:
         for name in flow.flat[:cutoff]:
             if not is_complete(name):
-                lines.append((label("!", name), RED))
+                lines.append((label("!", name), RED, risky(name)))
 
     if current < len(flow.main):
-        if ShowWarnings.value is True and flow.main[current] in RISKY_MISSIONS:
-            lines.append((WARNING_TEXT, RED))
-
         # What the timeline offers next, main and side alike, after the one you are on.
         ahead = 0
         for name in flow.flat[cutoff:]:
@@ -220,10 +215,10 @@ def build_lines() -> list[tuple[str, tuple[int, int, int]]]:
                 break
             if is_complete(name) or name == tracked:
                 continue
-            lines.append((label("...", name), GREY))
+            lines.append((label("...", name), GREY, risky(name)))
             ahead += 1
     else:
-        lines.append(("All missions done", WHITE))
+        lines.append(("All missions done", WHITE, False))
 
     return lines
 
@@ -308,35 +303,32 @@ def on_render(
                 for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE, BLACK)
             }
 
-        where = Position.value
-        if where == "Top left":
-            left = PANEL_MARGIN
-        elif where == "Top centre":
-            left = (canvas.SizeX - PANEL_WIDTH) / 2
-        else:
-            left = canvas.SizeX - PANEL_WIDTH - PANEL_MARGIN
-
         y = PANEL_TOP
 
         canvas.Font = font
 
-        # A line wider than the panel wraps round to the far side of the screen, so
-        # it is cut short until it fits. Measuring is not cheap, so it is done once
-        # for each new set of lines rather than every frame.
+        # Each line is measured so the warning can start where it ends. Measuring is
+        # not cheap, so it is done once for each new set of lines rather than every
+        # frame.
         if trimmed_lines is None:
             trimmed_lines = []
-            for text, colour in cached_lines:
+            for text, colour, warn in cached_lines:
                 line = text
-                for _ in range(len(text)):
+                try:
+                    width = float(canvas.TextSize(line, TEXT_SCALE, TEXT_SCALE)[1])
+                except Exception:
+                    width = len(line) * 10.0
+
+                # The warning goes on the same row, straight after the mission, and
+                # the panel grows to fit it rather than cutting it short.
+                after = f"  |  {WARNING_TEXT}" if warn else ""
+                after_width = 0.0
+                if after:
                     try:
-                        width = float(canvas.TextSize(line, TEXT_SCALE, TEXT_SCALE)[0])
+                        after_width = float(canvas.TextSize(after, TEXT_SCALE, TEXT_SCALE)[1])
                     except Exception:
-                        # No measurement to be had, so the character cap has to do.
-                        break
-                    if width <= PANEL_WIDTH or len(line) <= 4:
-                        break
-                    line = line[:-4] + "..."
-                trimmed_lines.append((line, colour))
+                        after_width = len(after) * 10.0
+                trimmed_lines.append((line, colour, after, width, width + after_width))
 
         # Lines past the bottom of the screen cannot be seen, and drawing them
         # still costs, so the list stops where the screen does.
@@ -347,11 +339,23 @@ def on_render(
         set_pos = canvas.SetPos
         draw_text = canvas.DrawText
 
+        widest = max([PANEL_WIDTH] + [row[4] for row in trimmed_lines])
+        where = Position.value
+        if where == "Top left":
+            left = PANEL_MARGIN
+        elif where == "Top centre":
+            left = (canvas.SizeX - widest) / 2
+        else:
+            left = canvas.SizeX - widest - PANEL_MARGIN
+
         showing = []
-        for line, colour in trimmed_lines:
+        warnings = []
+        for line, colour, after, width, _whole in trimmed_lines:
             if y > bottom:
                 break
             showing.append((line, colour, y))
+            if after:
+                warnings.append((after, left + width, y))
             y += LINE_HEIGHT
 
         # A black pass all the way round first, so the words stand out against
@@ -362,6 +366,10 @@ def on_render(
             for across, down in OUTLINE_STEPS:
                 set_pos(left + across, at + down)
                 draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
+        for after, start, at in warnings:
+            for across, down in OUTLINE_STEPS:
+                set_pos(start + across, at + down)
+                draw_text(after, False, TEXT_SCALE, TEXT_SCALE)
 
         together: dict[tuple[int, int, int], list] = {}
         for line, colour, at in showing:
@@ -372,6 +380,12 @@ def on_render(
             for line, at in rows:
                 set_pos(left, at)
                 draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
+
+        if warnings:
+            canvas.DrawColor = colours[RED]
+            for after, start, at in warnings:
+                set_pos(start, at)
+                draw_text(after, False, TEXT_SCALE, TEXT_SCALE)
     except Exception as ex:
         logging.dev_warning(f"[Mission Progress] could not draw ({ex})")
 

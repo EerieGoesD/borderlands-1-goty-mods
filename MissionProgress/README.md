@@ -14,7 +14,7 @@ mission flow.
 
 - **Enable DLC Missions**: 216 missions instead of 126.
 - **Flag Skipped Missions**: The red list on or off.
-- **Achievement Warnings**: A red note when a known bug in the current mission can cost you an achievement.
+- **Achievement Warnings**: A red note at the end of a mission's row when a known bug in that mission can cost you an achievement.
 - **Enable Side Missions**: Side missions counted and listed, or main missions only.
 - **Upcoming missions shown**: How many missions to list ahead.
 

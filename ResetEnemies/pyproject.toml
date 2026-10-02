@@ -1,6 +1,6 @@
 [project]
 name = "ResetEnemies"
-version = "1.0.2"
+version = "1.0.3"
 authors = [{ name = "eeriegoesd" }]
 description = """Brings the enemies in the area back without reloading your save.
 

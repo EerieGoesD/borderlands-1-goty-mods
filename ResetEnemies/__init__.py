@@ -75,6 +75,14 @@ def fill_the_dens() -> None:
             # it is not allowed to send anything before. Both are wound back so it
             # treats the area as untouched.
             tally = den.SpawnData
+
+            # A spot with no enemy type set, or no room for any, is not a real
+            # spawn point. Telling one of those to spawn takes the game down.
+            if str(tally.PopulationDefName) in ("", "None"):
+                continue
+            if int(tally.MaxActiveActors) <= 0:
+                continue
+
             tally.NextSpawnTime = 0.0
             tally.NumTotalActors = 0
             den.SpawnData = tally

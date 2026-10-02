@@ -13,6 +13,7 @@ The distance to each mark is written above it.
 - Pink: health
 - Red: an unopened red chest
 - White: an unopened white chest
+- Deep pink: an unopened Knoxx chest
 
 ## Settings
 
@@ -22,6 +23,7 @@ The distance to each mark is written above it.
 - **Show Health Loot**: Health on the compass.
 - **Show Red Chests**: Red chests nobody has opened yet.
 - **Show White Chests**: White chests nobody has opened yet.
+- **Show Knoxx Chests**: Knoxx DLC chests nobody has opened yet.
 - **Display Only Better Weapons**: Hides weapons that are worse than the worst one of that
   type you already carry, and stops you picking them up. Score is shots x damage x pellets,
   divided by (shots x fire interval plus reload), where shots is the magazine divided by

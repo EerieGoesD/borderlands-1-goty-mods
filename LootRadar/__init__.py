@@ -57,10 +57,14 @@ HEALTH_COLOUR = (255, 120, 160)
 MONEY_COLOUR = (255, 210, 0)
 CHEST_COLOUR = (255, 60, 60)
 WHITE_CHEST_COLOUR = (245, 245, 245)
+# A deeper pink than health, so the two can be told apart.
+KNOXX_CHEST_COLOUR = (255, 70, 220)
 
 # The chests, as the game names them.
 RED_CHEST = "InteractiveObj_TreasureChest"
 WHITE_CHEST = "InteractiveObj_Crate_Metal"
+# Covers both chests the Knoxx DLC uses, the plain one and the "ChestSurprise" one.
+KNOXX_CHEST = "InteractiveObj_crimson_Chest"
 
 ShowWeapons = BoolOption("Show Weapon Loot", True, "Yes", "No")
 ShowMoney = BoolOption("Show Money Loot", True, "Yes", "No")
@@ -68,6 +72,7 @@ ShowAmmo = BoolOption("Show Ammo Loot", True, "Yes", "No")
 ShowHealth = BoolOption("Show Health Loot", True, "Yes", "No")
 ShowRedChests = BoolOption("Show Red Chests", True, "Yes", "No")
 ShowWhiteChests = BoolOption("Show White Chests", True, "Yes", "No")
+ShowKnoxxChests = BoolOption("Show Knoxx Chests", True, "Yes", "No")
 BetterOnly = BoolOption("Display Only Better Weapons", False, "Yes", "No")
 HideFull = BoolOption("Hide Full Pickups", True, "On", "Off")
 ShowDistance = BoolOption("Show Distance", True, "Yes", "No")
@@ -482,7 +487,11 @@ def find_chests() -> list[tuple[tuple[float, float, float], str]]:
 
     found: list[tuple[tuple[float, float, float], str]] = []
 
-    if ShowRedChests.value is False and ShowWhiteChests.value is False:
+    if (
+        ShowRedChests.value is False
+        and ShowWhiteChests.value is False
+        and ShowKnoxxChests.value is False
+    ):
         return found
 
     chest_frames += 1
@@ -499,11 +508,15 @@ def find_chests() -> list[tuple[tuple[float, float, float], str]]:
                 chest_list.append((thing, "chest"))
             elif WHITE_CHEST in definition:
                 chest_list.append((thing, "white"))
+            elif KNOXX_CHEST in definition:
+                chest_list.append((thing, "knoxx"))
 
     for thing, kind in chest_list:
         if kind == "chest" and ShowRedChests.value is False:
             continue
         if kind == "white" and ShowWhiteChests.value is False:
+            continue
+        if kind == "knoxx" and ShowKnoxxChests.value is False:
             continue
         try:
             if thing.bCanBeUsed is not True:
@@ -760,6 +773,13 @@ def on_render(
             B=WHITE_CHEST_COLOUR[2],
             A=255,
         )
+        colours["knoxx"] = unrealsdk.make_struct(
+            "Color",
+            R=KNOXX_CHEST_COLOUR[0],
+            G=KNOXX_CHEST_COLOUR[1],
+            B=KNOXX_CHEST_COLOUR[2],
+            A=255,
+        )
 
     try:
         here = pc.Pawn.Location
@@ -841,6 +861,7 @@ build_mod(
         ShowHealth,
         ShowRedChests,
         ShowWhiteChests,
+        ShowKnoxxChests,
         BetterOnly,
         ShowDistance,
         Units,

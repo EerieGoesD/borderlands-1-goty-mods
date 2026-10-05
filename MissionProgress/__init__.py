@@ -212,7 +212,12 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     elif current < len(flow.main):
         cutoff = flow.position[flow.main[current]]
     else:
-        cutoff = len(flow.flat)
+        # Every main mission is done, so the first side mission still open is
+        # where you are.
+        cutoff = next(
+            (i for i, name in enumerate(flow.flat) if not is_complete(name)),
+            len(flow.flat),
+        )
 
     # Everything the timeline offered before that, and never got done.
     if ShowSkipped.value is True:
@@ -220,17 +225,18 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
             if not is_complete(name):
                 lines.append((label("!", name), RED, risky(name)))
 
-    if current < len(flow.main):
-        # What the timeline offers next, main and side alike, after the one you are on.
-        ahead = 0
-        for name in flow.flat[cutoff:]:
-            if ahead >= NextCount.value:
-                break
-            if is_complete(name) or name == tracked:
-                continue
-            lines.append((label("...", name), GREY, risky(name)))
-            ahead += 1
-    else:
+    # What the timeline offers next, main and side alike, after the one you are on.
+    ahead = 0
+    for name in flow.flat[cutoff:]:
+        if ahead >= NextCount.value:
+            break
+        if is_complete(name) or name == tracked:
+            continue
+        lines.append((label("...", name), GREY, risky(name)))
+        ahead += 1
+
+    # Only once every mission on the list is finished, side missions included.
+    if len(done) == len(flow.flat):
         lines.append(("All missions done", WHITE, False))
 
     return lines

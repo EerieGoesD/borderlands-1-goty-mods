@@ -9,13 +9,7 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
-from .missions import (
-    ALL_MISSIONS,
-    BASE_ONLY,
-    BASE_ONLY_MAIN,
-    WITH_DLC,
-    WITH_DLC_MAIN,
-)
+from .missions import ALL_MISSIONS, flow_for
 
 FONT = "ui_fonts.font_willowbody_18pt"
 
@@ -71,6 +65,13 @@ NextCount = SliderOption("Upcoming missions shown", 3, 0, 8, 1, True)
 ShowSkipped = BoolOption("Flag Skipped Missions", True, "On", "Off")
 ShowWarnings = BoolOption("Achievement Warnings", True, "On", "Off")
 EnableSide = BoolOption("Enable Side Missions", True, "Yes", "No")
+SortBy = SpinnerOption(
+    "Sort By",
+    value="Mission flow",
+    choices=["Mission flow", "Level"],
+    wrap_enabled=True,
+    description="Level puts missions in order of the level they are pitched at on your playthrough. Missions on the same level keep the mission flow order.",
+)
 
 definitions: dict[str, UObject] = {}
 
@@ -158,11 +159,23 @@ def tracked_name() -> str | None:
         return None
 
 
+def playthrough() -> int:
+    """Which playthrough you are on, 0 for the first."""
+    pc = get_pc()
+    if pc is None:
+        return 0
+    try:
+        return int(pc.GetCurrentPlaythrough())
+    except Exception:
+        return 0
+
+
 def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
-    if EnableDLC.value is True:
-        flow = WITH_DLC if EnableSide.value is True else WITH_DLC_MAIN
-    else:
-        flow = BASE_ONLY if EnableSide.value is True else BASE_ONLY_MAIN
+    flow = flow_for(
+        EnableDLC.value is True,
+        EnableSide.value is True,
+        playthrough() if SortBy.value == "Level" else None,
+    )
 
     finished = completed_names()
 
@@ -395,7 +408,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position],
+    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position, SortBy],
     keybinds=[],
     hooks=[on_render],
     commands=[],

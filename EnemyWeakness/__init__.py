@@ -185,6 +185,11 @@ def advice_for(pawn: UObject) -> tuple[str, str] | None:
         state = pawn.BalanceDefinitionState
         balance = state.BalanceDefinition
         if balance is None:
+            # A car has no entry of its own. One with an enemy at the wheel takes
+            # the vehicle advice, the same for a bandit runner or a Lancer.
+            driver = getattr(pawn, "Driver", None)
+            if driver is not None and "AIPawn" in str(driver.Class):
+                return ADVICE["vehicle"]
             return None
         path = str(balance)
         grade = int(state.GradeIndex)

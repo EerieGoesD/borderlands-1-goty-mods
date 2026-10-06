@@ -1121,13 +1121,16 @@ def carried_items() -> list[tuple[UObject, bool]]:
     except Exception:
         return found
 
-    try:
-        item = getattr(manager, "InventoryChain", None)
-        while item is not None and len(found) < CARRY_LIMIT:
-            found.append((item, True))
-            item = getattr(item, "Inventory", None)
-    except Exception:
-        pass
+    # Guns you have equipped sit on one chain, the shield, class mod and
+    # grenade mod you are wearing on another.
+    for chain in ("InventoryChain", "ItemChain"):
+        try:
+            item = getattr(manager, chain, None)
+            while item is not None and len(found) < CARRY_LIMIT:
+                found.append((item, True))
+                item = getattr(item, "Inventory", None)
+        except Exception:
+            pass
 
     try:
         for item in manager.Backpack:
@@ -1141,10 +1144,28 @@ def carried_items() -> list[tuple[UObject, bool]]:
     return found
 
 
-def describe(item: UObject, equipped: bool, pawn: UObject | None) -> dict:
+def describe(item: UObject, equipped: bool, pc: UObject, pawn: UObject | None) -> dict:
     """Everything the clean up needs to know about one item, read once."""
     kind = item_kind(item)
     facts = {"item": item, "kind": kind, "equipped": equipped}
+
+    # The game's own answers: can you use it at all, and if not, is it only
+    # your level that is short.
+    try:
+        facts["usable"] = pawn is not None and item.CanBeUsedBy(pawn) is True
+    except Exception:
+        facts["usable"] = False
+    facts["level_locked"] = False
+    if not facts["usable"]:
+        try:
+            met = item.IsLevelRequirementMet(pc)
+            # The game hands the required level back alongside the answer, so
+            # the answer is the first entry.
+            if isinstance(met, tuple):
+                met = met[0]
+            facts["level_locked"] = met is not True
+        except Exception:
+            facts["level_locked"] = True
 
     if kind == "weapon":
         facts["score"] = get_dps(None, "", item)
@@ -1157,45 +1178,46 @@ def describe(item: UObject, equipped: bool, pawn: UObject | None) -> dict:
             facts["price"] = int(item.CashValue)
         except Exception:
             facts["price"] = None
-        try:
-            facts["usable"] = pawn is not None and item.CanBeUsedBy(pawn) is True
-        except Exception:
-            facts["usable"] = False
 
     return facts
 
 
 def plan_clean_up(carried: list[dict]) -> list[dict]:
-    """Which of the items in the bag should go.
+    """Which of the items you carry should go, equipped or not.
 
     Shields: only the highest Shield Power stays. Class mods: only the most expensive one
     your character can use stays. Weapons: a gun stays while it is the best of its
     type, the best of its element, or the best of its type and element together,
-    the way the card's comparison marks it, with ties kept. Grenade mods and
-    everything else are left alone. Nothing equipped is ever dropped.
+    the way the card's comparison marks it, with ties kept. Class mods for other
+    characters go. Grenade mods and everything else are left alone. Anything your
+    level is too low for is neither counted nor dropped.
     """
     going: list[dict] = []
+    carried = [f for f in carried if not f["level_locked"]]
 
     # Shields.
-    shields = [f for f in carried if f["kind"] == "shield" and f["score"] is not None]
+    shields = [f for f in carried if f["kind"] == "shield" and f["usable"] and f["score"] is not None]
     if shields:
         top = max(f["score"] for f in shields)
         for facts in shields:
-            if not facts["equipped"] and facts["score"] < top:
+            if facts["score"] < top:
                 going.append(facts)
 
-    # Class mods.
+    # Class mods: another character's go, the priciest of yours stays.
     mods = [f for f in carried if f["kind"] == "class mod"]
-    usable = [f for f in mods if f["usable"] and f["price"] is not None]
-    if usable:
-        priciest = max(f["price"] for f in usable)
-        keeper = next(f for f in usable if f["price"] == priciest)
-        for facts in mods:
-            if not facts["equipped"] and facts is not keeper:
+    for facts in mods:
+        if not facts["usable"]:
+            going.append(facts)
+    yours = [f for f in mods if f["usable"] and f["price"] is not None]
+    if yours:
+        priciest = max(f["price"] for f in yours)
+        keeper = next(f for f in yours if f["price"] == priciest)
+        for facts in yours:
+            if facts is not keeper:
                 going.append(facts)
 
     # Weapons, scored the way the card prints them.
-    guns = [f for f in carried if f["kind"] == "weapon" and f["score"] is not None and f["type"] is not None]
+    guns = [f for f in carried if f["kind"] == "weapon" and f["usable"] and f["score"] is not None and f["type"] is not None]
     best_type: dict[str, int] = {}
     best_element: dict[str | None, int] = {}
     best_both: dict[tuple[str, str | None], int] = {}
@@ -1206,8 +1228,6 @@ def plan_clean_up(carried: list[dict]) -> list[dict]:
         pair = (facts["type"], facts["element"])
         best_both[pair] = max(best_both.get(pair, 0), score)
     for facts in guns:
-        if facts["equipped"]:
-            continue
         score = round(facts["score"])
         stays = (
             score >= best_type[facts["type"]]
@@ -1229,12 +1249,13 @@ def clean_up() -> None:
     # Everything is read and dropped in this one go. Holding an item until a
     # later frame takes the game down once the game has let go of it.
     pawn = pc.Pawn
-    carried = [describe(item, equipped, pawn) for item, equipped in carried_items()]
+    carried = [describe(item, equipped, pc, pawn) for item, equipped in carried_items()]
     going = plan_clean_up(carried)
 
     # The game's own Drop throws the item and then takes it off the backpack
     # list. Without the second step the backpack screen keeps showing it until
-    # the next area change.
+    # the next area change. An equipped item is not on that list, the throw
+    # alone unequips it.
     try:
         manager = pawn.InvManager
     except Exception:
@@ -1244,7 +1265,7 @@ def clean_up() -> None:
     for facts in going:
         try:
             pc.ThrowInventory(facts["item"], 1)
-            if manager is not None:
+            if manager is not None and not facts["equipped"]:
                 manager.RemoveInventoryFromBackpack(facts["item"])
             dropped += 1
         except Exception as ex:
@@ -1262,8 +1283,10 @@ CleanUp = ButtonOption(
     on_press=on_clean_up,
     description=(
         "Drops every shield but the one with the highest Shield Power, every class mod"
-        " but the most expensive one your character can use, and every gun that is not your"
-        " best of its type, its element, or both. Grenade mods are left alone."
+        " but the most expensive one, and every gun that is not your best of its type,"
+        " its element, or both. Equipped items count too. Class mods for other characters"
+        " are dropped. Anything your level is too low for is neither counted nor dropped."
+        " Grenade mods are left alone."
     ),
 )
 

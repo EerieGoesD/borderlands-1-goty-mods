@@ -18,7 +18,7 @@ itself, unrounded, so it can differ slightly from the card.
 - **Disregard Elements**: Ignores burn, shock and corrosion. Turn it off and the extra damage an elemental gun throws is added, scaled by its x1 to x4 rating.
 - **Compare vs current gear**: Adds indicators comparing the gun with the guns you carry, equipped and in your backpack: your best of all, of the same weapon type, of the same element, and of both. Off by default.
 - **Score font size**: How big the number is printed on the card.
-- **Clean Up Inventory**: Drops every shield but the one with the highest Shield Power, every class mod but the most expensive one your character can use, and every gun that is not your best of its type, its element, or both. Grenade mods and equipped items are left alone.
+- **Clean Up Inventory**: Drops every shield but the one with the highest Shield Power, every class mod but the most expensive one, and every gun that is not your best of its type, its element, or both. Equipped items count too. Class mods for other characters are dropped. Anything your level is too low for is neither counted nor dropped. Grenade mods are left alone.
 
 ## Install
 

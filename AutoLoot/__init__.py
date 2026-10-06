@@ -122,6 +122,10 @@ def on_render(
         try:
             if pickup.bPickupable is not True or pickup.Inventory is None:
                 continue
+            # Already on its way out, such as after Clear Loot, though the game
+            # would still hand it over if asked.
+            if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
+                continue
 
             spot = pickup.Location
             gap = (

@@ -70,7 +70,7 @@ SortBy = SpinnerOption(
     value="Mission flow",
     choices=["Mission flow", "Level"],
     wrap_enabled=True,
-    description="Level puts missions in order of the level they are pitched at on your playthrough. Missions on the same level keep the mission flow order.",
+    description="Level puts missions in order of the level they are pitched at on your playthrough, and only lists the ones you can take right now. Missions on the same level keep the mission flow order.",
 )
 
 definitions: dict[str, UObject] = {}
@@ -150,6 +150,38 @@ def completed_names() -> set[str]:
     return finished
 
 
+def unlocked(name: str, finished: set[str]) -> bool:
+    """Whether the game would hand this mission out now: all it depends on is done.
+
+    A mission the game has not loaded yet cannot be checked, so it stays listed.
+    """
+    mission = definitions.get(name)
+    if mission is None:
+        return True
+    try:
+        needed = list(mission.Dependencies)
+    except Exception:
+        return True
+
+    pc = get_pc()
+    for other in needed:
+        if other is None:
+            continue
+        try:
+            if str(other.MissionName) in finished:
+                continue
+        except Exception:
+            continue
+        # Something off our list, so the game is asked directly.
+        try:
+            if pc is not None and pc.IsMissionInStatus(other, STATUS_COMPLETE) is True:
+                continue
+        except Exception:
+            pass
+        return False
+    return True
+
+
 def tracked_name() -> str | None:
     """The mission you picked in the log, which the compass is following."""
     try:
@@ -181,6 +213,13 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
 
     def is_complete(name: str) -> bool:
         return name in finished
+
+    # Sorted by level, a mission still locked behind another one is left out,
+    # since its level says nothing about when you can take it.
+    by_level = SortBy.value == "Level"
+
+    def hidden(name: str) -> bool:
+        return by_level and not unlocked(name, finished)
 
     done = [name for name in flow.flat if is_complete(name)]
     percent = round(100 * len(done) / len(flow.flat)) if flow.flat else 0
@@ -222,7 +261,7 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     # Everything the timeline offered before that, and never got done.
     if ShowSkipped.value is True:
         for name in flow.flat[:cutoff]:
-            if not is_complete(name):
+            if not is_complete(name) and not hidden(name):
                 lines.append((label("!", name), RED, risky(name)))
 
     # What the timeline offers next, main and side alike, after the one you are on.
@@ -230,7 +269,7 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     for name in flow.flat[cutoff:]:
         if ahead >= NextCount.value:
             break
-        if is_complete(name) or name == tracked:
+        if is_complete(name) or name == tracked or hidden(name):
             continue
         lines.append((label("...", name), GREY, risky(name)))
         ahead += 1

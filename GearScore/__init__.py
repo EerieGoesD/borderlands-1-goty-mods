@@ -1168,7 +1168,7 @@ def describe(item: UObject, equipped: bool, pawn: UObject | None) -> dict:
 def plan_clean_up(carried: list[dict]) -> list[dict]:
     """Which of the items in the bag should go.
 
-    Shields: only the highest Shield Power stays. Class mods: only the dearest one
+    Shields: only the highest Shield Power stays. Class mods: only the most expensive one
     your character can use stays. Weapons: a gun stays while it is the best of its
     type, the best of its element, or the best of its type and element together,
     the way the card's comparison marks it, with ties kept. Grenade mods and
@@ -1188,8 +1188,8 @@ def plan_clean_up(carried: list[dict]) -> list[dict]:
     mods = [f for f in carried if f["kind"] == "class mod"]
     usable = [f for f in mods if f["usable"] and f["price"] is not None]
     if usable:
-        dearest = max(f["price"] for f in usable)
-        keeper = next(f for f in usable if f["price"] == dearest)
+        priciest = max(f["price"] for f in usable)
+        keeper = next(f for f in usable if f["price"] == priciest)
         for facts in mods:
             if not facts["equipped"] and facts is not keeper:
                 going.append(facts)
@@ -1262,7 +1262,7 @@ CleanUp = ButtonOption(
     on_press=on_clean_up,
     description=(
         "Drops every shield but the one with the highest Shield Power, every class mod"
-        " but the dearest one your character can use, and every gun that is not your"
+        " but the most expensive one your character can use, and every gun that is not your"
         " best of its type, its element, or both. Grenade mods are left alone."
     ),
 )

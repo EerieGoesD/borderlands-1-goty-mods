@@ -7,7 +7,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from mods_base import SETTINGS_DIR, Game, build_mod, get_pc, hook
-from mods_base.options import BoolOption, SliderOption
+from mods_base.options import BoolOption, ButtonOption, SliderOption
 
 FLASH_CARD = "topLevel_mc.card"
 PICKUP_CARD = "inventory.card1"
@@ -1084,6 +1084,190 @@ def on_vendor_compare(
     update_cards(obj)
 
 
+
+# What the game calls each kind of item, in its definition name.
+SHIELD_ITEM = "Item_Shield"
+CLASS_MOD_ITEM = "Item_CommandDeck"
+GRENADE_MOD_ITEM = "Item_GrenadeModulator"
+
+
+def item_kind(item: UObject) -> str:
+    """Weapon, shield, class mod, grenade mod, or something else."""
+    if is_weapon(item):
+        return "weapon"
+    try:
+        name = str(item.DefinitionData.ItemDefinition.Name)
+    except Exception:
+        return "other"
+    if SHIELD_ITEM in name:
+        return "shield"
+    if CLASS_MOD_ITEM in name:
+        return "class mod"
+    if GRENADE_MOD_ITEM in name:
+        return "grenade mod"
+    return "other"
+
+
+def carried_items() -> list[tuple[UObject, bool]]:
+    """Everything you have on you, and whether it is equipped rather than in the bag."""
+    found: list[tuple[UObject, bool]] = []
+
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        return found
+
+    try:
+        manager = pc.Pawn.InvManager
+    except Exception:
+        return found
+
+    try:
+        item = getattr(manager, "InventoryChain", None)
+        while item is not None and len(found) < CARRY_LIMIT:
+            found.append((item, True))
+            item = getattr(item, "Inventory", None)
+    except Exception:
+        pass
+
+    try:
+        for item in manager.Backpack:
+            if item is not None:
+                found.append((item, False))
+            if len(found) >= CARRY_LIMIT:
+                break
+    except Exception:
+        pass
+
+    return found
+
+
+def describe(item: UObject, equipped: bool, pawn: UObject | None) -> dict:
+    """Everything the clean up needs to know about one item, read once."""
+    kind = item_kind(item)
+    facts = {"item": item, "kind": kind, "equipped": equipped}
+
+    if kind == "weapon":
+        facts["score"] = get_dps(None, "", item)
+        facts["type"] = read_kind(item)
+        facts["element"] = read_element(item)
+    elif kind == "shield":
+        facts["score"] = get_shield_score(item)
+    elif kind == "class mod":
+        try:
+            facts["price"] = int(item.CashValue)
+        except Exception:
+            facts["price"] = None
+        try:
+            facts["usable"] = pawn is not None and item.CanBeUsedBy(pawn) is True
+        except Exception:
+            facts["usable"] = False
+
+    return facts
+
+
+def plan_clean_up(carried: list[dict]) -> list[dict]:
+    """Which of the items in the bag should go.
+
+    Shields: only the highest Shield Power stays. Class mods: only the dearest one
+    your character can use stays. Weapons: a gun stays while it is the best of its
+    type, the best of its element, or the best of its type and element together,
+    the way the card's comparison marks it, with ties kept. Grenade mods and
+    everything else are left alone. Nothing equipped is ever dropped.
+    """
+    going: list[dict] = []
+
+    # Shields.
+    shields = [f for f in carried if f["kind"] == "shield" and f["score"] is not None]
+    if shields:
+        top = max(f["score"] for f in shields)
+        for facts in shields:
+            if not facts["equipped"] and facts["score"] < top:
+                going.append(facts)
+
+    # Class mods.
+    mods = [f for f in carried if f["kind"] == "class mod"]
+    usable = [f for f in mods if f["usable"] and f["price"] is not None]
+    if usable:
+        dearest = max(f["price"] for f in usable)
+        keeper = next(f for f in usable if f["price"] == dearest)
+        for facts in mods:
+            if not facts["equipped"] and facts is not keeper:
+                going.append(facts)
+
+    # Weapons, scored the way the card prints them.
+    guns = [f for f in carried if f["kind"] == "weapon" and f["score"] is not None and f["type"] is not None]
+    best_type: dict[str, int] = {}
+    best_element: dict[str | None, int] = {}
+    best_both: dict[tuple[str, str | None], int] = {}
+    for facts in guns:
+        score = round(facts["score"])
+        best_type[facts["type"]] = max(best_type.get(facts["type"], 0), score)
+        best_element[facts["element"]] = max(best_element.get(facts["element"], 0), score)
+        pair = (facts["type"], facts["element"])
+        best_both[pair] = max(best_both.get(pair, 0), score)
+    for facts in guns:
+        if facts["equipped"]:
+            continue
+        score = round(facts["score"])
+        stays = (
+            score >= best_type[facts["type"]]
+            or score >= best_element[facts["element"]]
+            or score >= best_both[(facts["type"], facts["element"])]
+        )
+        if not stays:
+            going.append(facts)
+
+    return going
+
+
+def clean_up() -> None:
+    """Drops everything the plan says, here and now."""
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        return
+
+    # Everything is read and dropped in this one go. Holding an item until a
+    # later frame takes the game down once the game has let go of it.
+    pawn = pc.Pawn
+    carried = [describe(item, equipped, pawn) for item, equipped in carried_items()]
+    going = plan_clean_up(carried)
+
+    # The game's own Drop throws the item and then takes it off the backpack
+    # list. Without the second step the backpack screen keeps showing it until
+    # the next area change.
+    try:
+        manager = pawn.InvManager
+    except Exception:
+        manager = None
+
+    dropped = 0
+    for facts in going:
+        try:
+            pc.ThrowInventory(facts["item"], 1)
+            if manager is not None:
+                manager.RemoveInventoryFromBackpack(facts["item"])
+            dropped += 1
+        except Exception as ex:
+            logging.dev_warning(f"[{LABEL}] could not drop an item ({ex})")
+
+    logging.info(f"[{LABEL}] clean up dropped {dropped} of {len(carried)} items")
+
+
+def on_clean_up(option) -> None:
+    clean_up()
+
+
+CleanUp = ButtonOption(
+    "Clean Up Inventory",
+    on_press=on_clean_up,
+    description=(
+        "Drops every shield but the one with the highest Shield Power, every class mod"
+        " but the dearest one your character can use, and every gun that is not your"
+        " best of its type, its element, or both. Grenade mods are left alone."
+    ),
+)
+
+
 # Gets populated from `build_mod` below
 __version__: str
 __version_info__: tuple[int, ...]
@@ -1097,6 +1281,7 @@ build_mod(
         DisregardElements,
         ShowComparison,
         FontSize,
+        CleanUp,
     ],
     keybinds=[],
     hooks=[

@@ -72,6 +72,14 @@ SortBy = SpinnerOption(
     wrap_enabled=True,
     description="Level puts missions in order of the level they are pitched at on your playthrough, and only lists the ones you can take right now. Missions on the same level keep the mission flow order.",
 )
+TextSize = SliderOption(
+    "Text Size",
+    100,
+    50,
+    150,
+    5,
+    True,
+)
 
 definitions: dict[str, UObject] = {}
 
@@ -90,6 +98,10 @@ menu_was_open = False
 
 font = None
 colours: dict[tuple[int, int, int], object] = {}
+
+# The text size the lines were last measured at, so they are measured again when
+# the setting moves.
+measured_scale = None
 
 
 # How many times to go looking for missions the game has not loaded yet. Some are
@@ -345,7 +357,7 @@ def on_render(
             cached_lines = fresh
             trimmed_lines = None
 
-    global font, colours
+    global font, colours, measured_scale
 
     try:
         if font is None:
@@ -362,20 +374,23 @@ def on_render(
             }
 
         y = PANEL_TOP
+        scale = TextSize.value / 100.0
+        line_height = LINE_HEIGHT * scale
 
         canvas.Font = font
 
         # Each line is measured so the warning can start where it ends. Measuring is
         # not cheap, so it is done once for each new set of lines rather than every
         # frame.
-        if trimmed_lines is None:
+        if trimmed_lines is None or measured_scale != scale:
+            measured_scale = scale
             trimmed_lines = []
             for text, colour, warn in cached_lines:
                 line = text
                 try:
-                    width = float(canvas.TextSize(line, TEXT_SCALE, TEXT_SCALE)[1])
+                    width = float(canvas.TextSize(line, scale, scale)[1])
                 except Exception:
-                    width = len(line) * 10.0
+                    width = len(line) * 10.0 * scale
 
                 # The warning goes on the same row, straight after the mission, and
                 # the panel grows to fit it rather than cutting it short.
@@ -383,21 +398,21 @@ def on_render(
                 after_width = 0.0
                 if after:
                     try:
-                        after_width = float(canvas.TextSize(after, TEXT_SCALE, TEXT_SCALE)[1])
+                        after_width = float(canvas.TextSize(after, scale, scale)[1])
                     except Exception:
-                        after_width = len(after) * 10.0
+                        after_width = len(after) * 10.0 * scale
                 trimmed_lines.append((line, colour, after, width, width + after_width))
 
         # Lines past the bottom of the screen cannot be seen, and drawing them
         # still costs, so the list stops where the screen does.
-        bottom = float(canvas.SizeY) - LINE_HEIGHT
+        bottom = float(canvas.SizeY) - line_height
 
         # Asking the game for a command costs more than the command does, so both
         # are asked for once and used for the whole panel.
         set_pos = canvas.SetPos
         draw_text = canvas.DrawText
 
-        widest = max([PANEL_WIDTH] + [row[4] for row in trimmed_lines])
+        widest = max([PANEL_WIDTH * scale] + [row[4] for row in trimmed_lines])
         where = Position.value
         if where == "Top left":
             left = PANEL_MARGIN
@@ -414,7 +429,7 @@ def on_render(
             showing.append((line, colour, y))
             if after:
                 warnings.append((after, left + width, y))
-            y += LINE_HEIGHT
+            y += line_height
 
         # A black pass all the way round first, so the words stand out against
         # whatever is behind them. Every line of it under the one colour, since
@@ -423,11 +438,11 @@ def on_render(
         for line, _colour, at in showing:
             for across, down in OUTLINE_STEPS:
                 set_pos(left + across, at + down)
-                draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
+                draw_text(line, False, scale, scale)
         for after, start, at in warnings:
             for across, down in OUTLINE_STEPS:
                 set_pos(start + across, at + down)
-                draw_text(after, False, TEXT_SCALE, TEXT_SCALE)
+                draw_text(after, False, scale, scale)
 
         together: dict[tuple[int, int, int], list] = {}
         for line, colour, at in showing:
@@ -437,13 +452,13 @@ def on_render(
             canvas.DrawColor = colours[colour]
             for line, at in rows:
                 set_pos(left, at)
-                draw_text(line, False, TEXT_SCALE, TEXT_SCALE)
+                draw_text(line, False, scale, scale)
 
         if warnings:
             canvas.DrawColor = colours[RED]
             for after, start, at in warnings:
                 set_pos(start, at)
-                draw_text(after, False, TEXT_SCALE, TEXT_SCALE)
+                draw_text(after, False, scale, scale)
     except Exception as ex:
         logging.dev_warning(f"[Mission Progress] could not draw ({ex})")
 
@@ -453,7 +468,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position, SortBy],
+    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position, SortBy, TextSize],
     keybinds=[],
     hooks=[on_render],
     commands=[],

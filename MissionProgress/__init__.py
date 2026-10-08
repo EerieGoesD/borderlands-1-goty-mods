@@ -9,7 +9,7 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 from mods_base.options import BoolOption, SliderOption, SpinnerOption
 
-from .missions import ALL_MISSIONS, flow_for
+from .missions import ALL_MISSIONS, WHERE, flow_for
 
 FONT = "ui_fonts.font_willowbody_18pt"
 
@@ -25,17 +25,17 @@ TEXT_SCALE = 1.0
 # How far the panel keeps clear of the screen edge.
 PANEL_MARGIN = 20
 
+# The line under a mission saying where it is: smaller, set in a little, in white.
+PLACE_SCALE = 0.75
+PLACE_HEIGHT = 22
+PLACE_INDENT = 24
+
 WHITE = (255, 255, 255)
 GOLD = (255, 210, 0)
 GREY = (150, 150, 150)
 RED = (230, 60, 60)
 GREEN = (90, 220, 90)
 BLUE = (90, 180, 255)
-BLACK = (0, 0, 0)
-
-# Where the black pass goes. One behind and to the side costs a single extra
-# drawing of each line rather than four.
-OUTLINE_STEPS = ((1, 1),)
 
 # Missions where a known bug can cost you an achievement.
 # The Crimson Armory door only stays open while one of these is active and unfinished,
@@ -80,11 +80,12 @@ TextSize = SliderOption(
     5,
     True,
 )
+ShowLocation = BoolOption("Show Mission Location", True, "On", "Off")
 
 definitions: dict[str, UObject] = {}
 
 next_build = 0.0
-cached_lines: list[tuple[str, tuple[int, int, int]]] = []
+cached_lines: list[tuple[str, tuple[int, int, int], bool, str | None]] = []
 trimmed_lines = None
 
 # Whether a shop screen is up, and the count until that is asked again. Only the
@@ -214,7 +215,7 @@ def playthrough() -> int:
         return 0
 
 
-def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
+def build_lines() -> list[tuple[str, tuple[int, int, int], bool, str | None]]:
     flow = flow_for(
         EnableDLC.value is True,
         EnableSide.value is True,
@@ -236,9 +237,13 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     done = [name for name in flow.flat if is_complete(name)]
     percent = round(100 * len(done) / len(flow.flat)) if flow.flat else 0
 
-    lines: list[tuple[str, tuple[int, int, int], bool]] = [
-        (f"Progress  {percent}%   {len(done)}/{len(flow.flat)}", BLUE, False),
+    lines: list[tuple[str, tuple[int, int, int], bool, str | None]] = [
+        (f"Progress  {percent}%   {len(done)}/{len(flow.flat)}", BLUE, False, None),
     ]
+
+    def place(name: str) -> str | None:
+        """Where the mission is and who gives it, for the line under it."""
+        return WHERE.get(name) if ShowLocation.value is True else None
 
     def risky(name: str) -> bool:
         """Whether the warning goes on this mission's row."""
@@ -255,7 +260,7 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     # Whatever you picked in the mission log is the one you are on.
     tracked = tracked_name()
     if tracked is not None and tracked in flow.kind:
-        lines.append((label(">", tracked), GOLD, risky(tracked)))
+        lines.append((label(">", tracked), GOLD, risky(tracked), place(tracked)))
 
     # Where you are in the timeline: the mission you are on, else the next main one.
     if tracked is not None and tracked in flow.position:
@@ -274,7 +279,7 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
     if ShowSkipped.value is True:
         for name in flow.flat[:cutoff]:
             if not is_complete(name) and not hidden(name):
-                lines.append((label("!", name), RED, risky(name)))
+                lines.append((label("!", name), RED, risky(name), place(name)))
 
     # What the timeline offers next, main and side alike, after the one you are on.
     ahead = 0
@@ -283,12 +288,12 @@ def build_lines() -> list[tuple[str, tuple[int, int, int], bool]]:
             break
         if is_complete(name) or name == tracked or hidden(name):
             continue
-        lines.append((label("...", name), GREY, risky(name)))
+        lines.append((label("...", name), GREY, risky(name), place(name)))
         ahead += 1
 
     # Only once every mission on the list is finished, side missions included.
     if len(done) == len(flow.flat):
-        lines.append(("All missions done", WHITE, False))
+        lines.append(("All missions done", WHITE, False, None))
 
     return lines
 
@@ -370,12 +375,15 @@ def on_render(
                     B=colour[2],
                     A=255,
                 )
-                for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE, BLACK)
+                for colour in (WHITE, GOLD, GREY, RED, GREEN, BLUE)
             }
 
         y = PANEL_TOP
         scale = TextSize.value / 100.0
         line_height = LINE_HEIGHT * scale
+        place_scale = scale * PLACE_SCALE
+        place_height = PLACE_HEIGHT * scale
+        place_indent = PLACE_INDENT * scale
 
         canvas.Font = font
 
@@ -385,7 +393,7 @@ def on_render(
         if trimmed_lines is None or measured_scale != scale:
             measured_scale = scale
             trimmed_lines = []
-            for text, colour, warn in cached_lines:
+            for text, colour, warn, where_given in cached_lines:
                 line = text
                 try:
                     width = float(canvas.TextSize(line, scale, scale)[1])
@@ -401,7 +409,22 @@ def on_render(
                         after_width = float(canvas.TextSize(after, scale, scale)[1])
                     except Exception:
                         after_width = len(after) * 10.0 * scale
-                trimmed_lines.append((line, colour, after, width, width + after_width))
+                place_width = 0.0
+                if where_given:
+                    try:
+                        place_width = float(canvas.TextSize(where_given, place_scale, place_scale)[1])
+                    except Exception:
+                        place_width = len(where_given) * 10.0 * place_scale
+                trimmed_lines.append(
+                    (
+                        line,
+                        colour,
+                        after,
+                        width,
+                        max(width + after_width, place_indent + place_width),
+                        where_given,
+                    ),
+                )
 
         # Lines past the bottom of the screen cannot be seen, and drawing them
         # still costs, so the list stops where the screen does.
@@ -423,26 +446,18 @@ def on_render(
 
         showing = []
         warnings = []
-        for line, colour, after, width, _whole in trimmed_lines:
+        places = []
+        for line, colour, after, width, _whole, where_given in trimmed_lines:
             if y > bottom:
                 break
             showing.append((line, colour, y))
             if after:
                 warnings.append((after, left + width, y))
             y += line_height
-
-        # A black pass all the way round first, so the words stand out against
-        # whatever is behind them. Every line of it under the one colour, since
-        # handing the game a colour costs as much as the drawing does.
-        canvas.DrawColor = colours[BLACK]
-        for line, _colour, at in showing:
-            for across, down in OUTLINE_STEPS:
-                set_pos(left + across, at + down)
-                draw_text(line, False, scale, scale)
-        for after, start, at in warnings:
-            for across, down in OUTLINE_STEPS:
-                set_pos(start + across, at + down)
-                draw_text(after, False, scale, scale)
+            if where_given:
+                if y <= bottom:
+                    places.append((where_given, y))
+                y += place_height
 
         together: dict[tuple[int, int, int], list] = {}
         for line, colour, at in showing:
@@ -459,6 +474,12 @@ def on_render(
             for after, start, at in warnings:
                 set_pos(start, at)
                 draw_text(after, False, scale, scale)
+
+        if places:
+            canvas.DrawColor = colours[WHITE]
+            for where_given, at in places:
+                set_pos(left + place_indent, at)
+                draw_text(where_given, False, place_scale, place_scale)
     except Exception as ex:
         logging.dev_warning(f"[Mission Progress] could not draw ({ex})")
 
@@ -468,7 +489,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position, SortBy, TextSize],
+    options=[EnableDLC, ShowSkipped, ShowWarnings, EnableSide, NextCount, Position, SortBy, TextSize, ShowLocation],
     keybinds=[],
     hooks=[on_render],
     commands=[],

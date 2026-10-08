@@ -1,6 +1,6 @@
 [project]
 name = "NoWeaponFlash"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Removes the flashes and sparks from gunfire, yours and enemies', each with its own setting.
 

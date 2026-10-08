@@ -1,6 +1,6 @@
 [project]
 name = "AudioOutputSelector"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Picks which audio device the game plays through, and switches it while the game is running.
 

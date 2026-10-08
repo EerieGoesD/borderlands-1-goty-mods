@@ -17,15 +17,16 @@ LABEL = "No Weapon Flash"
 saved_effect: dict[str, tuple[str, str] | None] = {}
 saved_light: dict[str, tuple[str, str] | None] = {}
 saved_burst: dict[str, tuple[str, str] | None] = {}
-saved_trail: dict[str, tuple[str, str] | None] = {}
 
 # Hit sparks, by where they sit. "parked" means the effect was moved to a spare slot
 # on the same entry, which keeps it held so it can always come back.
 saved_spark: dict[str, str | tuple[str, str] | None] = {}
 
-# Guns whose explosions and trails have been looked at since they were turned off,
-# by name.
+# Guns whose explosions have been looked at since they were turned off, by name.
 burst_checked: set[str] = set()
+
+# The trail emitters switched off, by name, and the guns already looked at.
+switched_off: set[str] = set()
 trail_checked: set[str] = set()
 
 # Surfaces load with each area, so the hit sparks are looked for again now and then
@@ -304,45 +305,49 @@ def show_explosions() -> None:
 
 
 # ---- The trail an elemental bullet leaves on its way --------------------------------
+# The trail effect is the bullet itself, so it stays. Only its emitters stop drawing.
 
 
-def empty_trail_of(mode: UObject | None) -> None:
+def quiet_trail_of(mode: UObject | None) -> None:
     if mode is None:
         return
     try:
-        path = mode._path_name()
-        if path not in saved_trail:
-            saved_trail[path] = name_of(mode.PartSysTemplate)
-        if mode.PartSysTemplate is not None:
-            mode.PartSysTemplate = None
+        trail = mode.PartSysTemplate
+        if trail is None:
+            return
+        for emitter in trail.Emitters:
+            if emitter is None:
+                continue
+            for level in emitter.LODLevels:
+                if level is not None and bool(level.bEnabled):
+                    level.bEnabled = False
+                    switched_off.add(level._path_name())
     except Exception as ex:
-        logging.dev_warning(f"[{LABEL}] could not empty a bullet trail ({ex})")
+        logging.dev_warning(f"[{LABEL}] could not quiet a bullet trail ({ex})")
 
 
-def empty_trails_gun(gun: UObject | None) -> None:
+def quiet_trails_gun(gun: UObject | None) -> None:
     if gun is None or str(gun.Name) in trail_checked:
         return
     trail_checked.add(str(gun.Name))
     for mode in firing_modes_of(gun):
-        empty_trail_of(mode)
+        quiet_trail_of(mode)
 
 
 def hide_trails() -> None:
     trail_checked.clear()
     for mode in unrealsdk.find_all("FiringModeDefinition"):
         if "Default__" not in mode._path_name():
-            empty_trail_of(mode)
+            quiet_trail_of(mode)
 
 
 def show_trails() -> None:
-    for path, saved_name in saved_trail.items():
+    for path in switched_off:
         try:
-            mode = unrealsdk.find_object("FiringModeDefinition", path)
-            if saved_name is not None:
-                mode.PartSysTemplate = find(saved_name)
+            unrealsdk.find_object("ParticleLODLevel", path).bEnabled = True
         except Exception as ex:
-            logging.dev_warning(f"[{LABEL}] could not put a bullet trail back ({ex})")
-    saved_trail.clear()
+            logging.dev_warning(f"[{LABEL}] could not switch a bullet trail back on ({ex})")
+    switched_off.clear()
     trail_checked.clear()
 
 
@@ -459,8 +464,15 @@ def show_sparks() -> None:
 # ---- Settings ----------------------------------------------------------------------
 
 
+def is_on(option: BoolOption) -> bool:
+    """Whether the mod is on. Saved settings are loaded while the mod is still being
+    built, and nothing should change in the game then."""
+    owner = getattr(option, "mod", None)
+    return owner is not None and owner.is_enabled
+
+
 def on_muzzle(option: BoolOption, shown: bool) -> None:
-    if not mod.is_enabled:
+    if not is_on(option):
         return
     if shown:
         show_muzzle()
@@ -469,7 +481,7 @@ def on_muzzle(option: BoolOption, shown: bool) -> None:
 
 
 def on_flicker(option: BoolOption, shown: bool) -> None:
-    if not mod.is_enabled:
+    if not is_on(option):
         return
     if shown:
         show_flicker()
@@ -478,7 +490,7 @@ def on_flicker(option: BoolOption, shown: bool) -> None:
 
 
 def on_explosions(option: BoolOption, shown: bool) -> None:
-    if not mod.is_enabled:
+    if not is_on(option):
         return
     if shown:
         show_explosions()
@@ -487,7 +499,7 @@ def on_explosions(option: BoolOption, shown: bool) -> None:
 
 
 def on_decals(option: BoolOption, shown: bool) -> None:
-    if not mod.is_enabled:
+    if not is_on(option):
         return
     if shown:
         show_sparks()
@@ -495,8 +507,14 @@ def on_decals(option: BoolOption, shown: bool) -> None:
         hide_sparks()
 
 
+WeaponMuzzle = BoolOption("Weapon Muzzle", False, "Enable", "Disable", on_change_anytime=on_muzzle)
+WeaponFlicker = BoolOption("Weapon Flicker", False, "Enable", "Disable", on_change_anytime=on_flicker)
+GunExplosions = BoolOption("Gun Explosions", False, "Enable", "Disable", on_change_anytime=on_explosions)
+BulletDecals = BoolOption("Bullet Decals", False, "Enable", "Disable", on_change_anytime=on_decals)
+
+
 def on_trails(option: BoolOption, shown: bool) -> None:
-    if not mod.is_enabled:
+    if not is_on(option):
         return
     if shown:
         show_trails()
@@ -504,10 +522,6 @@ def on_trails(option: BoolOption, shown: bool) -> None:
         hide_trails()
 
 
-WeaponMuzzle = BoolOption("Weapon Muzzle", False, "Enable", "Disable", on_change_anytime=on_muzzle)
-WeaponFlicker = BoolOption("Weapon Flicker", False, "Enable", "Disable", on_change_anytime=on_flicker)
-GunExplosions = BoolOption("Gun Explosions", False, "Enable", "Disable", on_change_anytime=on_explosions)
-BulletDecals = BoolOption("Bullet Decals", False, "Enable", "Disable", on_change_anytime=on_decals)
 BulletTrails = BoolOption("Bullet Trails", False, "Enable", "Disable", on_change_anytime=on_trails)
 
 
@@ -534,7 +548,7 @@ def on_disable() -> None:
         show_explosions()
     if saved_spark:
         show_sparks()
-    if saved_trail:
+    if switched_off:
         show_trails()
 
 
@@ -553,7 +567,7 @@ def on_fire(
     if GunExplosions.value is False:
         empty_bursts_gun(obj)
     if BulletTrails.value is False:
-        empty_trails_gun(obj)
+        quiet_trails_gun(obj)
     if BulletDecals.value is False and time.monotonic() - spark_scanned_at >= SPARK_RESCAN_SECONDS:
         hide_sparks()
 

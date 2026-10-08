@@ -1,5 +1,7 @@
 import ctypes
 import json
+import time
+import uuid
 from ctypes import wintypes
 from pathlib import Path
 
@@ -175,6 +177,66 @@ def device_names(system: int) -> list[str]:
     return names
 
 
+# The id Windows uses for "whatever the default playback device is".
+DEFAULT_PLAYBACK = uuid.UUID("def00000-9c6d-47ed-aaf1-4dda8f2b5c03")
+
+DEVICE_FOUND = ctypes.WINFUNCTYPE(
+    wintypes.BOOL,
+    ctypes.c_void_p,
+    wintypes.LPCWSTR,
+    wintypes.LPCWSTR,
+    ctypes.c_void_p,
+)
+
+
+def windows_devices() -> tuple[list[str], str | None]:
+    """Every playback device as Windows lists it, and which one is the default.
+
+    These are the same names the game's sound library uses, and Windows can be asked
+    at any time, so the list is ready before the game's sound is.
+    """
+    try:
+        dsound = ctypes.WinDLL("dsound")
+        dsound.DirectSoundEnumerateW.argtypes = [DEVICE_FOUND, ctypes.c_void_p]
+        dsound.DirectSoundEnumerateW.restype = ctypes.c_long
+        dsound.GetDeviceID.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        dsound.GetDeviceID.restype = ctypes.c_long
+    except Exception as ex:
+        logging.dev_warning(f"[{LABEL}] could not ask Windows for devices ({ex})")
+        return [], None
+
+    found: list[tuple[uuid.UUID, str]] = []
+
+    def seen(guid, description, module, context) -> bool:
+        # The first entry stands for "the default device" and has no id of its own.
+        if guid:
+            raw = ctypes.string_at(guid, 16)
+            found.append((uuid.UUID(bytes_le=raw), description or ""))
+        return True
+
+    callback = DEVICE_FOUND(seen)
+    if dsound.DirectSoundEnumerateW(callback, None) != 0:
+        return [], None
+
+    names: list[str] = []
+    ids: dict[uuid.UUID, str] = {}
+    for index, (guid, name) in enumerate(found):
+        name = name or f"Device {index + 1}"
+        # Two devices with the same name still need telling apart.
+        if name in names:
+            name = f"{name} ({names.count(name) + 1})"
+        names.append(name)
+        ids[guid] = name
+
+    default = None
+    source = ctypes.create_string_buffer(DEFAULT_PLAYBACK.bytes_le, 16)
+    target = ctypes.create_string_buffer(16)
+    if dsound.GetDeviceID(source, target) == 0:
+        default = ids.get(uuid.UUID(bytes_le=target.raw))
+
+    return names, default
+
+
 def current_device(system: int) -> int:
     current = ctypes.c_int(-1)
     if library[0]["current"](system, ctypes.byref(current)) != FMOD_OK:
@@ -232,9 +294,9 @@ def saved_device() -> str | None:
 # Set while the list is being filled in, so filling it does not count as a pick.
 filling = False
 
-# How many frames to keep looking for the game's sound before giving up.
-LOOKS = 600
-looks = 0
+# How long to keep looking for the game's sound before giving up, in seconds.
+LOOK_SECONDS = 60.0
+looking_since = None
 
 
 def fill_list(system: int) -> list[str]:
@@ -266,20 +328,47 @@ def on_apply(option: ButtonOption) -> None:
 
 
 def on_scan(option: ButtonOption) -> None:
+    names, default = windows_devices()
+    if names:
+        show_devices(names, default)
+        return
     system = sound_system()
     if system is not None:
         fill_list(system)
 
 
+def show_devices(names: list[str], default: str | None) -> None:
+    """Puts Windows' devices in the list, keeping the picked one when it is still there."""
+    global filling
+
+    pick = Device.value
+    if pick not in names:
+        pick = default if default in names else names[0]
+
+    filling = True
+    try:
+        Device.choices = names
+        Device.value = pick
+    finally:
+        filling = False
+
+
 wanted = saved_device()
+startup_names, startup_default = windows_devices()
+if wanted in startup_names:
+    startup_pick = wanted
+elif startup_names:
+    startup_pick = startup_default if startup_default in startup_names else startup_names[0]
+else:
+    startup_pick = SEARCHING
 
 # The heading on one row and the device on the row below it, so a long device name
 # has the whole row to itself. The heading is a row that does nothing when pressed.
 Heading = ButtonOption(GROUP_NAME)
 Device = SpinnerOption(
     DEVICE_NAME,
-    wanted or SEARCHING,
-    [wanted or SEARCHING],
+    startup_pick,
+    startup_names or [SEARCHING],
     wrap_enabled=True,
     display_name="",
 )
@@ -301,25 +390,26 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Once the game's sound is up, lists the devices and moves to the saved one."""
-    global looks
+    """Once the game's sound is up, moves it to the saved device."""
+    global looking_since
 
-    looks += 1
+    now = time.monotonic()
+    if looking_since is None:
+        looking_since = now
     system = sound_system()
     if system is None:
-        if looks >= LOOKS:
+        if now - looking_since >= LOOK_SECONDS:
             logging.dev_warning(f"[{LABEL}] could not find the game's sound")
             on_render.disable()
         return
 
-    saved = Device.value
-    names = fill_list(system)
-    if not names:
+    # Only when Windows could not be asked, the game's own list is used instead.
+    if Device.choices == [SEARCHING] and not fill_list(system):
         return
 
     set_volume(Volume.value)
-    if saved in names:
-        switch_to(saved)
+    if wanted is not None and Device.value != SEARCHING:
+        switch_to(Device.value)
 
     # Done for this session.
     try:

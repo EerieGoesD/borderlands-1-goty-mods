@@ -11,8 +11,8 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import SETTINGS_DIR, build_mod, hook
 from mods_base.options import ButtonOption, SliderOption, SpinnerOption
 
-LABEL = "Audio Output"
-SETTINGS = Path(f"{SETTINGS_DIR}/AudioOutput.json")
+LABEL = "Audio Output Selector"
+SETTINGS = Path(f"{SETTINGS_DIR}/AudioOutputSelector.json")
 GROUP_NAME = "Audio Output Device"
 DEVICE_NAME = "Device"
 
@@ -334,4 +334,4 @@ build_mod(
     settings_file=SETTINGS,
 )
 
-logging.info(f"Audio Output Loaded: {__version__}, {__version_info__}")
+logging.info(f"Audio Output Selector Loaded: {__version__}, {__version_info__}")

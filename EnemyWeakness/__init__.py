@@ -38,33 +38,34 @@ ELEMENT_WORDS = (
 
 # What to use against each kind of enemy: the gun type, then the element.
 ADVICE = {
-    "bandit": ("Revolver", "Fire, Shock on a shield"),
+    "bandit": ("Revolver or Sniper", "Fire, Shock on a shield"),
     "psycho": ("Shotgun", "Fire"),
-    "bruiser": ("Shotgun", "Fire"),
-    "bmidget": ("Sniper", "Fire"),
+    "bruiser": ("Shotgun or SMG", "Fire"),
+    "bmidget": ("Sniper or Revolver", "Fire"),
     "midget": ("Shotgun", "Fire"),
-    "skag": ("Shotgun", "Fire"),
+    "skag": ("Shotgun or Revolver", "Fire"),
     "alpha": ("Shotgun", "Fire"),
     "skagfire": ("Revolver", "Shock"),
-    "spider": ("Revolver", "Explosive"),
-    "spidfire": ("Revolver", "Explosive"),
-    "rakk": ("SMG", "Fire"),
-    "rakkfire": ("SMG", "Shock"),
-    "scythid": ("Shotgun", "None"),
-    "lance": ("Revolver", "Corrosive"),
+    "spider": ("Revolver or Shotgun", "Explosive"),
+    "spidfire": ("Sniper or Revolver", "Explosive"),
+    "bspider": ("Sniper or Revolver", "Explosive"),
+    "rakk": ("SMG, Shotgun or Combat Rifle", "Fire"),
+    "rakkfire": ("Shotgun or SMG", "Shock"),
+    "scythid": ("Shotgun or SMG", "None"),
+    "lance": ("Revolver or Sniper", "Corrosive"),
     "defender": ("Sniper", "Corrosive"),
     "chem": ("Revolver", "Fire"),
-    "royal": ("Revolver", "Shock then Corrosive"),
-    "assassin": ("Shotgun", "Shock then Fire"),
-    "devast": ("Sniper", "Corrosive"),
-    "probe": ("SMG", "Shock"),
-    "guardian": ("SMG", "Shock"),
+    "royal": ("Revolver or SMG", "Shock then Corrosive"),
+    "assassin": ("Shotgun or SMG", "Shock then Fire"),
+    "devast": ("Sniper or Revolver", "Corrosive"),
+    "probe": ("SMG or Combat Rifle", "Shock"),
+    "guardian": ("SMG or Revolver", "Shock"),
     "turret": ("Revolver", "Corrosive"),
     "crab": ("Eridian", "Corrosive"),
     "larva": ("Revolver", "Explosive"),
-    "green": ("Revolver", "Fire"),
-    "drifter": ("Sniper", "Shock"),
-    "zombie": ("Combat Rifle", "Fire"),
+    "green": ("Revolver or Sniper", "Fire"),
+    "drifter": ("Sniper or Revolver", "Shock"),
+    "zombie": ("Combat Rifle, SMG or Revolver", "Fire"),
     "suicide": ("Revolver", "Fire"),
     "tank": ("Combat Rifle", "Fire, never Shock"),
     "clap": ("Revolver", "Corrosive"),
@@ -76,23 +77,23 @@ ADVICE = {
 
 # Bosses and named enemies that do not follow their family, by the name shown.
 NAMED = {
-    "General Knoxx": ("Sniper", "Explosive"),
-    "Pumpkin Head": ("Sniper", "Explosive"),
+    "General Knoxx": ("Sniper or Revolver", "Explosive"),
+    "Pumpkin Head": ("Sniper or Launcher", "Explosive"),
     "Queen Tarantella": ("Revolver", "None"),
     "Widowmaker": ("Revolver", "Explosive"),
-    "Shank": ("SMG", "Shock then Fire"),
+    "Shank": ("SMG or Shotgun", "Shock then Fire"),
     "Motor Head": ("Revolver", "Fire or Corrosive"),
-    "Crawmerax the Invincible": ("Sniper", "Corrosive"),
-    "Rakkinishu": ("Shotgun", "Explosive"),
-    "Mothrakk": ("Sniper", "Explosive"),
-    "Rakk Hive": ("Sniper", "Explosive"),
-    "Awesome Rakk Hive": ("Sniper", "Explosive"),
-    "Ultimate Rakk Hive": ("Sniper", "Explosive"),
-    "Rakk-Trap Hive": ("Sniper", "Explosive"),
-    "The Destroyer": ("Sniper", "Explosive"),
+    "Crawmerax the Invincible": ("Sniper or Revolver", "Corrosive"),
+    "Rakkinishu": ("Shotgun or Combat Rifle", "Explosive"),
+    "Mothrakk": ("Sniper or Launcher", "Explosive"),
+    "Rakk Hive": ("Sniper or Launcher", "Explosive"),
+    "Awesome Rakk Hive": ("Sniper or Launcher", "Explosive"),
+    "Ultimate Rakk Hive": ("Sniper or Launcher", "Explosive"),
+    "Rakk-Trap Hive": ("Sniper or Launcher", "Explosive"),
+    "The Destroyer": ("Sniper or Launcher", "Explosive"),
     "Moe": ("Shotgun", "Shock"),
     "Marley": ("Shotgun", "Fire"),
-    "Franken Bill": ("Revolver", "Fire, never Shock"),
+    "Franken Bill": ("Revolver or Sniper", "Fire, never Shock"),
     "Undead Ned": ("Sniper", "Fire"),
     "MINAC": ("Revolver", "Corrosive"),
     "Ajax": ("Revolver", "Corrosive"),
@@ -116,7 +117,11 @@ def kind_of(path: str, name: str) -> str:
     if "scythid" in p or any(w in n for w in ("scythid", "crawler", "bleeder", "slither")):
         return "scythid"
     if "spiderant" in n:
-        return "spidfire" if any(w in n for w in ("burner", "incinerator", "cremator")) else "spider"
+        if any(w in n for w in ("burner", "incinerator", "cremator")):
+            return "spidfire"
+        if any(w in n for w in ("badass", "badmutha", "superbad")):
+            return "bspider"
+        return "spider"
     if "rakk" in n:
         return "rakkfire" if "fire" in n else "rakk"
     if "wereskag" in n:
@@ -291,6 +296,11 @@ def weapon_facts(pc: UObject) -> tuple[str | None, str | None]:
     return held
 
 
+def wanted_guns(text: str) -> set:
+    """Which gun types an advice line names, such as "SMG, Shotgun or Combat Rifle"."""
+    return {part.strip() for part in text.replace(" or ", ", ").split(",") if part.strip()}
+
+
 def wanted_elements(text: str) -> set:
     """Which elements an advice line accepts. "Fire, never Shock" accepts fire only,
     "None" accepts a plain gun."""
@@ -358,7 +368,7 @@ def on_render(
 
         # Each half judged on its own: the gun in your hands against the gun type,
         # and the element it fires against the elements the line accepts.
-        gun_colour = colours["good"] if family == gun else colours["bad"]
+        gun_colour = colours["good"] if family in wanted_guns(gun) else colours["bad"]
         element_colour = colours["good"] if firing in wanted_elements(element) else colours["bad"]
 
         canvas.Font = font

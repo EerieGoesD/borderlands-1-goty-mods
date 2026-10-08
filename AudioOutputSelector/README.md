@@ -1,4 +1,4 @@
-# Audio Output
+# Audio Output Selector
 
 Picks which audio device the game plays through, and switches it while the game is running.
 

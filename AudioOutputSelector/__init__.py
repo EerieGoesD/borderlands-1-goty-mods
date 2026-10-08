@@ -49,11 +49,6 @@ def sound_library():
                 call("FMOD_System_GetDriverInfo", 20),
                 [ctypes.c_void_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_void_p],
             ),
-            "master": (
-                call("FMOD_System_GetMasterChannelGroup", 8),
-                [ctypes.c_void_p, ctypes.POINTER(ctypes.c_void_p)],
-            ),
-            "volume": (call("FMOD_ChannelGroup_SetVolume", 8), [ctypes.c_void_p, ctypes.c_float]),
         }
         for function, args in calls.values():
             function.argtypes = args
@@ -81,6 +76,16 @@ psapi = ctypes.WinDLL("psapi")
 
 class ModuleInfo(ctypes.Structure):
     _fields_ = [("base", ctypes.c_void_p), ("size", wintypes.DWORD), ("entry", ctypes.c_void_p)]
+
+
+# Spelled out so a 64-bit handle is passed whole on Enhanced.
+psapi.GetModuleInformation.argtypes = [
+    wintypes.HANDLE,
+    ctypes.c_void_p,
+    ctypes.POINTER(ModuleInfo),
+    wintypes.DWORD,
+]
+psapi.GetModuleInformation.restype = wintypes.BOOL
 
 
 def library_range() -> tuple[int, int] | None:
@@ -196,17 +201,18 @@ def switch_to(name: str) -> None:
 
 
 def set_volume(percent: float) -> None:
-    """Sets the volume of everything the game plays."""
-    system = sound_system()
-    if system is None:
+    """Sets the volume of everything the game plays, through the game's own master volume.
+
+    The sound library's own volume is ignored by Enhanced, the game's is not.
+    """
+    for device in unrealsdk.find_all("FMODAudioDevice"):
+        if str(device.Name).startswith("Default__"):
+            continue
+        try:
+            device.TransientMasterVolume = max(0.0, min(100.0, float(percent))) / 100.0
+        except Exception as ex:
+            logging.dev_warning(f"[{LABEL}] could not set the volume ({ex})")
         return
-    calls = library[0]
-    master = ctypes.c_void_p(0)
-    if calls["master"](system, ctypes.byref(master)) != FMOD_OK or not master.value:
-        return
-    result = calls["volume"](master, ctypes.c_float(max(0.0, min(100.0, float(percent))) / 100.0))
-    if result != FMOD_OK:
-        logging.dev_warning(f"[{LABEL}] could not set the volume (error {result})")
 
 
 def saved_device() -> str | None:

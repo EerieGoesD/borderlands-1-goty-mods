@@ -1,4 +1,4 @@
-# Enemy Weakness
+# Enemy Weakness Indicator
 
 Shows the best weapon type and element for the enemy under your crosshair.
 

@@ -1,3 +1,4 @@
+import math
 import re
 from pathlib import Path
 
@@ -20,7 +21,10 @@ SHIELD_LABEL = "Shield Power"
 COMPARISON = re.compile(r"^All\W+\S\W+Type\W+\S\W+(?:Element|No\W+Elem)\W+\S\W+Both\W")
 
 # Seconds of fighting the shield score is measured over.
-SHIELD_WINDOW = 60.0
+# A human body as the game shapes it, used when your own cannot be read: half the
+# width and half the height, in units.
+BODY_RADIUS = 36.0
+BODY_HALF_HEIGHT = 72.0
 
 ACCURACY_FIELDS = ("accuracy", "acc")
 
@@ -50,6 +54,20 @@ DisregardAccuracy = BoolOption("Disregard Accuracy", True, "Yes", "No")
 DisregardCritical = BoolOption("Disregard Critical", True, "Yes", "No")
 DisregardElements = BoolOption("Disregard Elements", False, "Yes", "No")
 FontSize = SliderOption("Score font size", 9, 0, 24, 1, True)
+Breather = SliderOption(
+    "Breather Seconds",
+    10,
+    0,
+    60,
+    1,
+    True,
+    description=(
+        "How many seconds you expect to be out of fire between bursts in a fight."
+        " Shield Power is the shield's capacity plus whatever it recharges in that"
+        " time, after its recharge delay, and never more than one full bar."
+        " At 0 shields are rated by capacity alone."
+    ),
+)
 ShowComparison = BoolOption(
     "Compare vs current gear",
     False,
@@ -380,6 +398,88 @@ def read_crit_bonus(weapon: UObject) -> float:
     return 0.0
 
 
+def usual_firing_mode(weapon: UObject) -> UObject | None:
+    """The bullet the gun fires on every shot: the highest tech ability it always
+    gets, else its plain bullet."""
+    try:
+        data = weapon.DefinitionData
+        level = float(weapon.TechLevel)
+    except Exception:
+        return None
+    chosen, chosen_level = None, -1.0
+    for prop in data._type._properties():
+        part = getattr(data, str(prop.Name), None)
+        abilities = getattr(part, "TechAbilities", None) if hasattr(part, "Class") else None
+        if not abilities:
+            continue
+        for ability in abilities:
+            try:
+                needed = float(ability.RequiredTechLevel)
+                chance = float(ability.ChanceOfHappening.BaseValueConstant)
+                mode = ability.TechFire
+            except Exception:
+                continue
+            if mode is None or chance < 100.0 or needed > level:
+                continue
+            if needed > chosen_level:
+                chosen, chosen_level = mode, needed
+    if chosen is None:
+        try:
+            chosen = data.WeaponTypeDefinition.DefaultFiringModeDefinition
+        except Exception:
+            return None
+    return chosen
+
+
+def swing_of(mode: UObject) -> tuple[float, float]:
+    """How far the bullet swings sideways and up and down on its way, in units."""
+    side = up = 0.0
+    try:
+        for line in mode.FiringPatternLines:
+            motion = line.CustomWaveMotion
+            if motion.bUseCustomWaveMotion is True:
+                side = max(side, abs(float(motion.WaveAmp.Y)))
+                up = max(up, abs(float(motion.WaveAmp.Z)))
+    except Exception:
+        pass
+    try:
+        side = max(side, abs(float(mode.WaveAmp.Y)))
+        up = max(up, abs(float(mode.WaveAmp.Z)))
+    except Exception:
+        pass
+    return side, up
+
+
+def body_size() -> tuple[float, float]:
+    """The width and height of a human body, read off your own character."""
+    try:
+        cylinder = get_pc().Pawn.CylinderComponent
+        return 2.0 * float(cylinder.CollisionRadius), 2.0 * float(cylinder.CollisionHeight)
+    except Exception:
+        return 2.0 * BODY_RADIUS, 2.0 * BODY_HALF_HEIGHT
+
+
+def straight_share(weapon: UObject) -> float:
+    """How much of its flight a bullet spends inside a human-sized body.
+
+    A straight bullet is always inside, so 1. A bullet that swings like a wave is
+    inside only while the wave is near its middle, which is what asin gives.
+    """
+    mode = usual_firing_mode(weapon)
+    if mode is None:
+        return 1.0
+    side, up = swing_of(mode)
+    if side <= 0.0 and up <= 0.0:
+        return 1.0
+    width, height = body_size()
+    share = 1.0
+    if side > 0.0:
+        share *= (2.0 / math.pi) * math.asin(min(1.0, width / (2.0 * side)))
+    if up > 0.0:
+        share *= (2.0 / math.pi) * math.asin(min(1.0, height / (2.0 * up)))
+    return share
+
+
 def get_dps(movie: UObject, card: str, weapon: UObject) -> float | None:
     """Damage per second over a full magazine, including the reload that follows it."""
     damage = read_weapon(weapon, "InstantHitDamage", 0)
@@ -400,6 +500,8 @@ def get_dps(movie: UObject, card: str, weapon: UObject) -> float | None:
         return None
 
     shot_damage = damage * max(projectiles, 1)
+    # A bullet that swings on its way misses most of the time, whatever the card says.
+    shot_damage *= straight_share(weapon)
     if DisregardAccuracy.value is False:
         shot_damage *= read_accuracy(movie, card) / 100
     if DisregardCritical.value is False:
@@ -441,7 +543,7 @@ def get_ui_stats(item: UObject) -> dict[str, float]:
 
 
 def get_shield_score(item: UObject) -> float | None:
-    """Damage the shield soaks over a minute: its capacity plus everything it recharges."""
+    """The shield's capacity plus what it gets back in one breather, at most a full bar."""
     stats = get_ui_stats(item)
     capacity = stats.get("ShieldMaxValue")
     rate = stats.get("ShieldOnIdleRegenerationRate")
@@ -449,7 +551,8 @@ def get_shield_score(item: UObject) -> float | None:
         return None
 
     delay = stats.get("ShieldOnIdleRegenerationDelay", 0.0)
-    return capacity + rate * max(SHIELD_WINDOW - delay, 0)
+    refill = rate * max(float(Breather.value) - delay, 0.0)
+    return capacity + min(capacity, refill)
 
 
 def carried_weapons() -> list[UObject]:
@@ -1304,6 +1407,7 @@ build_mod(
         DisregardElements,
         ShowComparison,
         FontSize,
+        Breather,
         CleanUp,
     ],
     keybinds=[],

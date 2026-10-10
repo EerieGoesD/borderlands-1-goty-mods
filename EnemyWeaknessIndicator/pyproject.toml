@@ -1,8 +1,8 @@
 [project]
 name = "EnemyWeaknessIndicator"
-version = "1.2.1"
+version = "1.3.0"
 authors = [{ name = "eeriegoesd" }]
-description = """Shows the best weapon type and element for the enemy under your crosshair.
+description = """Shows the best weapon type, element and weak spot for the enemy under your crosshair.
 
 For full information about this mod and to report bugs, please visit: https://eeriegoesd.com/gaming/mods/"""
 

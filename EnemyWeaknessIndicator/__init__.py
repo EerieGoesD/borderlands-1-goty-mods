@@ -6,6 +6,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from .elements import ELEMENT_BY_ENEMY
+from .weakspots import WEAK_SPOT_BY_ENEMY
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 
 FONT = "ui_fonts.font_willowbody_18pt"
@@ -220,9 +221,9 @@ def kind_of(path: str, name: str) -> str:
     return "bandit"
 
 
-def advice_for(pawn: UObject) -> tuple[str, str] | None:
-    """The gun and element for the enemy under the crosshair, or nothing if it is
-    not an enemy."""
+def advice_for(pawn: UObject) -> tuple[str, str, str] | None:
+    """The gun, element and weak spot for the enemy under the crosshair, or nothing
+    if it is not an enemy. The weak spot is empty when the game marks none."""
     try:
         state = pawn.BalanceDefinitionState
         balance = state.BalanceDefinition
@@ -231,7 +232,7 @@ def advice_for(pawn: UObject) -> tuple[str, str] | None:
             # the vehicle advice, the same for a bandit runner or a Lancer.
             driver = getattr(pawn, "Driver", None)
             if driver is not None and "AIPawn" in str(driver.Class):
-                return ADVICE["vehicle"]
+                return (*ADVICE["vehicle"], "")
             return None
         path = str(balance)
         grade = int(state.GradeIndex)
@@ -251,21 +252,24 @@ def advice_for(pawn: UObject) -> tuple[str, str] | None:
     # The element comes from the game's own data for this exact enemy when there is
     # one. Shields that bandits carry as items are not in that data, so their reminder
     # to shock a shield stays.
+    spot = ""
     try:
-        worked_out = ELEMENT_BY_ENEMY.get(balance._path_name())
+        full_path = balance._path_name()
+        worked_out = ELEMENT_BY_ENEMY.get(full_path)
+        spot = WEAK_SPOT_BY_ENEMY.get(full_path, "")
     except Exception:
         worked_out = None
     if worked_out:
         if "Shock on a shield" in element and "Shock" not in worked_out:
             worked_out += ", Shock on a shield"
         element = worked_out
-    return gun, element
+    return gun, element, spot
 
 
 # The advice for the enemy last seen under the crosshair, and that enemy's name, so
 # it is only worked out again when the target changes. Only text is kept, never the
 # enemy itself, since the game is free to let go of it at any time.
-shown: tuple[str, str] | None = None
+shown: tuple[str, str, str] | None = None
 shown_for = ""
 
 # The same for the gun in your hands.
@@ -276,8 +280,8 @@ font = None
 colours: dict = {}
 
 
-def target_advice(pc: UObject) -> tuple[str, str] | None:
-    """The gun and element for whatever the HUD says is under the crosshair."""
+def target_advice(pc: UObject) -> tuple[str, str, str] | None:
+    """The gun, element and weak spot for whatever the HUD says is under the crosshair."""
     global shown, shown_for
 
     try:
@@ -295,6 +299,21 @@ def target_advice(pc: UObject) -> tuple[str, str] | None:
         shown_for = who
         shown = advice_for(pawn)
     return shown
+
+
+def pack_on_target(pc: UObject) -> bool:
+    """Whether the enemy under the crosshair carries something bolted on that can be
+    shot off it, such as the pack on a Badass Chemical Trooper's back. Read fresh
+    every time, since the pack can be blown off at any moment."""
+    try:
+        for thing in pc.myHUD.HUDMovie.CurrentTargetable[0].Attached:
+            if thing is None or "WillowInteractiveObject" not in str(thing.Class):
+                continue
+            if thing.InteractiveObjectDefinition.bCanBeKilled is True and float(thing.Health) > 0.0:
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def weapon_facts(pc: UObject) -> tuple[str | None, str | None]:
@@ -352,17 +371,15 @@ def wanted_guns(text: str) -> set:
 
 
 def wanted_elements(text: str) -> set:
-    """Which elements an advice line accepts. "Fire" accepts fire only,
-    "None" accepts a plain gun."""
-    if text == "None":
-        return {None}
+    """Which elements an advice line accepts. "Fire" accepts fire only. "None"
+    accepts a plain gun, and an explosive one, whose hit is the same as a plain
+    gun's in the game's damage numbers."""
     accepted = set()
-    banned = False
     for word in text.replace(",", " ").split():
-        if word == "never":
-            banned = True
-            continue
-        if word in ("Fire", "Shock", "Corrosive", "Explosive") and not banned:
+        if word == "None":
+            accepted.add(None)
+            accepted.add("Explosive")
+        elif word in ("Fire", "Shock", "Corrosive", "Explosive"):
             accepted.add(word)
     return accepted
 
@@ -398,7 +415,7 @@ def on_render(
     if advice is None:
         return
     try:
-        if pc.bStatusMenuOpen is True:
+        if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
             return
     except Exception:
         pass
@@ -413,7 +430,9 @@ def on_render(
             for name, (r, g, b) in (("white", (255, 255, 255)), ("black", (0, 0, 0)), ("good", GOOD), ("bad", BAD)):
                 colours[name] = unrealsdk.make_struct("Color", R=r, G=g, B=b, A=255)
 
-        gun, element = advice
+        gun, element, spot = advice
+        if pack_on_target(pc):
+            spot = f"{spot} and the pack on its back" if spot else "pack on its back"
         family, firing = weapon_facts(pc)
 
         # Each half judged on its own: the gun in your hands against the gun type,
@@ -426,7 +445,9 @@ def on_render(
         y = canvas.SizeY * NAME_BELOW
         x += paint(canvas, x, y, gun, gun_colour)
         x += paint(canvas, x, y, " / ", colours["white"])
-        paint(canvas, x, y, element, element_colour)
+        x += paint(canvas, x, y, element, element_colour)
+        if spot:
+            paint(canvas, x, y, f" / {spot}", colours["white"])
     except Exception as ex:
         logging.dev_warning(f"[Enemy Weakness Indicator] could not draw ({ex})")
 

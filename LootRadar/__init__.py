@@ -702,9 +702,9 @@ def on_render(
     if not marks:
         return
 
-    # Nothing of ours draws while the menu with the map and skills is up.
+    # Nothing of ours draws while the menu with the map and skills or the pause screen is up.
     try:
-        if pc.bStatusMenuOpen is True:
+        if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
             return
 
         # A shop screen counts too. Asking the game which screen it is playing every

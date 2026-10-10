@@ -7,9 +7,12 @@ and on loot lying on the ground. Page Up and Page Down in the backpack shows a D
 listing everything you carry best first.
 
 Weapons: `shots x damage x pellets / (shots x fire interval + reload)`, where shots is
-the magazine divided by the ammo each shot costs. Shields:
-`capacity + recharge rate x (60 - recharge delay)`. Every number comes off the item
-itself, unrounded, so it can differ slightly from the card.
+the magazine divided by the ammo each shot costs. A gun whose bullets swing on their
+way, such as the Madjack, is scaled down by how much of the flight the bullet spends
+inside a human-sized body. Shields:
+`capacity + recharge rate x (breather - recharge delay)`, with the recharge part never
+more than the capacity. Every number comes off the item itself, unrounded, so it can
+differ slightly from the card.
 
 ## Settings
 
@@ -18,6 +21,7 @@ itself, unrounded, so it can differ slightly from the card.
 - **Disregard Elements**: Ignores burn, shock and corrosion. Turn it off and the extra damage an elemental gun throws is added, scaled by its x1 to x4 rating.
 - **Compare vs current gear**: Adds indicators comparing the gun with the guns you carry, equipped and in your backpack: your best of all, of the same weapon type, of the same element, and of both. Off by default.
 - **Score font size**: How big the number is printed on the card.
+- **Breather Seconds**: How many seconds you expect to be out of fire between bursts in a fight. Shield Power is the shield's capacity plus whatever it recharges in that time, after its recharge delay, and never more than one full bar. At 0 shields are rated by capacity alone.
 - **Clean Up Inventory**: Drops every shield but the one with the highest Shield Power, every class mod but the most expensive one, and every gun that is not your best of its type, its element, or both. Equipped items count too. Class mods for other characters are dropped. Anything your level is too low for is neither counted nor dropped. Grenade mods are left alone.
 
 ## Install

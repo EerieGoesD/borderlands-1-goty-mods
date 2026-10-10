@@ -12,7 +12,7 @@ from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: igno
 from mods_base import MODS_DIR, SETTINGS_DIR, build_mod, get_ordered_mod_list, get_pc, hook
 from mods_base.options import BoolOption, ButtonOption, SliderOption, SpinnerOption
 
-LOG_STEM = "CrashDebug"
+LOG_STEM = "ModDebugging"
 ENDINGS = [".log", ".txt"]
 
 # Where the note can go. The mods folder is the one that always exists.
@@ -120,6 +120,12 @@ cost_font = None
 cost_white = None
 cost_black = None
 
+# Whether a shop screen is up. Asking the game which screen it is playing every
+# frame is too slow, so it is asked now and then and only the answer is kept.
+SHOP_SECONDS = 0.5
+shop_open = False
+shop_asked = 0.0
+
 # Where the newest line sits, so its mark can be wiped when the next one lands.
 last_slot: int | None = None
 broken = False
@@ -154,7 +160,7 @@ def start_log(place: str | None = None, ending: str | None = None) -> None:
             os.O_CREAT | os.O_WRONLY | os.O_TRUNC | getattr(os, "O_BINARY", 0),
         )
     except Exception as ex:
-        logging.dev_warning(f"[Crash Debug] could not open the note ({ex})")
+        logging.dev_warning(f"[Mod Debugging] could not open the note ({ex})")
         log_file = None
         return
 
@@ -165,7 +171,7 @@ def start_log(place: str | None = None, ending: str | None = None) -> None:
     written = 0
     last_slot = None
     broken = False
-    note("Crash Debug started")
+    note("Mod Debugging started")
 
 
 def stop_log() -> None:
@@ -206,7 +212,7 @@ def note(text: str) -> None:
         global broken
         if not broken:
             broken = True
-            logging.dev_warning(f"[Crash Debug] could not write the note ({ex})")
+            logging.dev_warning(f"[Mod Debugging] could not write the note ({ex})")
         return
 
     last_slot = where
@@ -235,7 +241,7 @@ def follow(mod_name: str, hook_name: str, inner):
         note(f"{mod_name} <- {hook_name}")
         return answer
 
-    watched.crash_debug_inner = inner
+    watched.mod_debugging_inner = inner
     return watched
 
 
@@ -246,12 +252,12 @@ def watch_mods() -> None:
 
     for mod in get_ordered_mod_list():
         name = str(mod.name)
-        if name == "Crash Debug":
+        if name == "Mod Debugging":
             continue
         for spot in getattr(mod, "hooks", ()) or ():
             try:
                 inner = spot.__wrapped__
-                if getattr(inner, "crash_debug_inner", None) is not None:
+                if getattr(inner, "mod_debugging_inner", None) is not None:
                     continue
                 where = spot.hook_funcs[0][0] if spot.hook_funcs else "?"
                 spot.__wrapped__ = follow(name, str(where).split(":")[-1], inner)
@@ -259,7 +265,7 @@ def watch_mods() -> None:
                     spot.enable()
                 wrapped.add(spot.hook_identifier)
             except Exception as ex:
-                logging.dev_warning(f"[Crash Debug] could not follow {name} ({ex})")
+                logging.dev_warning(f"[Mod Debugging] could not follow {name} ({ex})")
 
 
 def unwatch_mods() -> None:
@@ -267,7 +273,7 @@ def unwatch_mods() -> None:
     for mod in get_ordered_mod_list():
         for spot in getattr(mod, "hooks", ()) or ():
             try:
-                inner = getattr(spot.__wrapped__, "crash_debug_inner", None)
+                inner = getattr(spot.__wrapped__, "mod_debugging_inner", None)
                 if inner is None:
                     continue
                 spot.__wrapped__ = inner
@@ -276,6 +282,36 @@ def unwatch_mods() -> None:
             except Exception:
                 continue
     wrapped.clear()
+
+
+def menu_up() -> bool:
+    """The pause screen or a shop is up."""
+    global shop_open, shop_asked
+
+    try:
+        pc = get_pc()
+        if pc is None:
+            return False
+        if pc.WorldInfo.Pauser is not None:
+            return True
+
+        now = time.monotonic()
+        if now - shop_asked >= SHOP_SECONDS:
+            shop_asked = now
+            shop_open = False
+            for manager in unrealsdk.find_all("WillowGFxUIManager"):
+                try:
+                    playing = manager.GetPlayingMovie()
+                except Exception:
+                    continue
+                if playing is None:
+                    continue
+                if "VendingMachine" in str(playing.Class.Name):
+                    shop_open = True
+                    break
+        return shop_open
+    except Exception:
+        return False
 
 
 def draw_costs(canvas) -> None:
@@ -306,6 +342,10 @@ def draw_costs(canvas) -> None:
     if canvas is None or not cost_lines:
         return
 
+    # Out of the way while the pause screen or a shop is up.
+    if menu_up():
+        return
+
     try:
         if cost_font is None:
             cost_font = unrealsdk.find_object("Font", COST_FONT)
@@ -333,7 +373,7 @@ def draw_costs(canvas) -> None:
             canvas.DrawText(line, False, 1.0, 1.0)
             y += COST_LINE
     except Exception as ex:
-        logging.dev_warning(f"[Crash Debug] could not draw the costs ({ex})")
+        logging.dev_warning(f"[Mod Debugging] could not draw the costs ({ex})")
 
 
 def area_name() -> str:
@@ -387,7 +427,7 @@ def on_disable() -> None:
     last_frame = 0.0
 
     unwatch_mods()
-    note("Crash Debug stopped")
+    note("Mod Debugging stopped")
     stop_log()
 
 
@@ -402,7 +442,7 @@ build_mod(
     commands=[],
     on_enable=on_enable,
     on_disable=on_disable,
-    settings_file=Path(f"{SETTINGS_DIR}/CrashDebug.json"),
+    settings_file=Path(f"{SETTINGS_DIR}/ModDebugging.json"),
 )
 
-logging.info(f"Crash Debug Loaded: {__version__}, {__version_info__}")
+logging.info(f"Mod Debugging Loaded: {__version__}, {__version_info__}")

@@ -1,4 +1,4 @@
-# Crash Debug
+# Mod Debugging
 
 Keeps a running note of what every mod is doing, so after a crash you can see which one
 ran last.

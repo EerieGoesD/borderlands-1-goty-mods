@@ -9,6 +9,7 @@ from mods_base.options import BoolOption, ButtonOption
 # The chests, as the game names them.
 RED_CHEST = "InteractiveObj_TreasureChest"
 WHITE_CHEST = "InteractiveObj_Crate_Metal"
+KNOXX_CHEST = "InteractiveObj_crimson_Chest"
 
 # What the game calls a chest that is shut and one that has been opened.
 SHUT = "closed"
@@ -16,6 +17,7 @@ OPENED = "Opened"
 
 ResetRed = BoolOption("Reset Red Chests", True, "Yes", "No")
 ResetWhite = BoolOption("Reset White Chests", True, "Yes", "No")
+ResetKnoxx = BoolOption("Reset Knoxx Chests", True, "Yes", "No")
 
 
 def wanted(definition: str) -> bool:
@@ -23,6 +25,8 @@ def wanted(definition: str) -> bool:
         return ResetRed.value is True
     if WHITE_CHEST in definition:
         return ResetWhite.value is True
+    if KNOXX_CHEST in definition:
+        return ResetKnoxx.value is True
     return False
 
 
@@ -69,7 +73,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
-    options=[Reset, ResetRed, ResetWhite],
+    options=[Reset, ResetRed, ResetWhite, ResetKnoxx],
     keybinds=[],
     hooks=[],
     commands=[],

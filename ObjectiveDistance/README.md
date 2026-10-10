@@ -17,6 +17,7 @@ waypoint points.
 - **Units**: Metres or feet.
 - **Position**: Under the compass or top of screen.
 - **Route Colour**: Green, blue, red, yellow or orange.
+- **Checks per second**: How often the distance and route line are worked out. Lower is better for performance.
 
 ## Install
 

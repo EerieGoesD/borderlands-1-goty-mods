@@ -1,5 +1,5 @@
 [project]
-name = "EnemyWeakness"
+name = "EnemyWeaknessIndicator"
 version = "1.2.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Shows the best weapon type and element for the enemy under your crosshair.
@@ -15,5 +15,5 @@ mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"
 auto_enable = true
-download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/EnemyWeakness/EnemyWeakness.sdkmod"
+download = "https://github.com/EerieGoesD/borderlands-1-goty-mods/raw/refs/heads/main/EnemyWeaknessIndicator/EnemyWeaknessIndicator.sdkmod"
 license = {name = "GPL-3.0-or-later", url = "https://www.gnu.org/licenses/gpl-3.0.en.html" }

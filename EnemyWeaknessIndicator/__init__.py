@@ -440,7 +440,7 @@ build_mod(
     keybinds=[],
     hooks=[on_render],
     commands=[],
-    settings_file=Path(f"{SETTINGS_DIR}/EnemyWeakness.json"),
+    settings_file=Path(f"{SETTINGS_DIR}/EnemyWeaknessIndicator.json"),
 )
 
 logging.info(f"Enemy Weakness Indicator Loaded: {__version__}, {__version_info__}")

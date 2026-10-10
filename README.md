@@ -5,9 +5,13 @@ Tested on both GOTY and GOTY Enhanced.
 
 | Mod | What it does |
 | --- | --- |
+| [Audio Output Selector](AudioOutputSelector) | Picks which audio device the game plays through, without restarting it |
 | [Auto Loot](AutoLoot) | Picks loot up as you walk over it, no key press needed |
+| [Clear Loot](ClearLoot) | Removes every item lying on the ground in the area |
 | [Continuous Fire](ContinuousFire) | Guns that fire in bursts keep firing while you hold the trigger |
 | [Mod Debugging](ModDebugging) | Notes what each mod is doing, so a crash says which one ran last |
+| [Enemy Weakness Indicator](EnemyWeaknessIndicator) | Shows the best weapon type, element and weak spot for the enemy under your crosshair |
+| [Full Money Indicator](FullMoneyIndicator) | Shows the full amount of money you carry, past the 9,999,999 the game displays |
 | [Gear Score](GearScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Infinite Ammo](InfiniteAmmo) | Unlimited ammo. No reload option |
@@ -22,10 +26,11 @@ Tested on both GOTY and GOTY Enhanced.
 | [No Recoil](NoRecoil) | Removes recoil from all weapons |
 | [No Reload](NoReload) | Your magazine never runs down |
 | [No Skill Cooldown](NoSkillCooldown) | Your action skill is ready every time you press the key |
+| [No Weapon Flash (Epilepsy Friendly)](NoWeaponFlash) | Removes the flashes and sparks from gunfire |
 | [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |
 | [Random Vehicle Colour](RandomVehicleColour) | Gives every vehicle you spawn a random paint job |
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
-| [Reset Chests](ResetChests) | Shuts every red and white chest you have opened in this area |
+| [Reset Chests](ResetChests) | Shuts every red, white and Knoxx chest you have opened in this area |
 | [Reset Enemies](ResetEnemies) | Brings the enemies in the area back without reloading your save |
 | [Run And Walk](RunAndWalk) | Makes running and walking work off a hold key and a toggle key |
 | [Sell Value](SellValue) | Shows what an item sells for on its card |

@@ -5,6 +5,7 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
+from .elements import ELEMENT_BY_ENEMY
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 
 FONT = "ui_fonts.font_willowbody_18pt"
@@ -67,7 +68,7 @@ ADVICE = {
     "drifter": ("Sniper or Revolver", "Shock"),
     "zombie": ("Combat Rifle, SMG or Revolver", "Fire"),
     "suicide": ("Revolver", "Fire"),
-    "tank": ("Combat Rifle", "Fire, never Shock"),
+    "tank": ("Combat Rifle", "Fire"),
     "clap": ("Revolver", "Corrosive"),
     "hyper": ("Revolver", "Corrosive"),
     "hguard": ("Sniper", "Corrosive"),
@@ -93,7 +94,7 @@ NAMED = {
     "The Destroyer": ("Sniper or Launcher", "Explosive"),
     "Moe": ("Shotgun", "Shock"),
     "Marley": ("Shotgun", "Fire"),
-    "Franken Bill": ("Revolver or Sniper", "Fire, never Shock"),
+    "Franken Bill": ("Revolver or Sniper", "Fire"),
     "Undead Ned": ("Sniper", "Fire"),
     "MINAC": ("Revolver", "Corrosive"),
     "Ajax": ("Revolver", "Corrosive"),
@@ -122,9 +123,10 @@ NAMED = {
     "Hera": ("Shotgun or SMG", "Shock then Fire"),
     "Minerva": ("Shotgun or SMG", "Shock then Fire"),
     "Vulcana": ("Shotgun or SMG", "Shock then Fire"),
-    "Commander Kyros": ("Revolver or Sniper", "Corrosive, Shock on a shield"),
+    # Kyros cannot be corroded, and carries ten times the usual shield.
+    "Commander Kyros": ("SMG", "Shock"),
     "Commander Typhon": ("Revolver or Sniper", "Corrosive, Shock on a shield"),
-    "Master McCloud": ("Revolver or Sniper", "Corrosive, Shock on a shield"),
+    "Master McCloud": ("Revolver or Sniper", "Corrosive"),
     "Skyscraper": ("Sniper or Revolver", "Shock"),
     "Mad Mel": ("Launcher", "Corrosive"),
     "Cluck-Trap": ("Revolver", "Corrosive"),
@@ -244,7 +246,20 @@ def advice_for(pawn: UObject) -> tuple[str, str] | None:
     except Exception:
         pass
 
-    return NAMED.get(name) or ADVICE[kind_of(path, name)]
+    gun, element = NAMED.get(name) or ADVICE[kind_of(path, name)]
+
+    # The element comes from the game's own data for this exact enemy when there is
+    # one. Shields that bandits carry as items are not in that data, so their reminder
+    # to shock a shield stays.
+    try:
+        worked_out = ELEMENT_BY_ENEMY.get(balance._path_name())
+    except Exception:
+        worked_out = None
+    if worked_out:
+        if "Shock on a shield" in element and "Shock" not in worked_out:
+            worked_out += ", Shock on a shield"
+        element = worked_out
+    return gun, element
 
 
 # The advice for the enemy last seen under the crosshair, and that enemy's name, so
@@ -337,7 +352,7 @@ def wanted_guns(text: str) -> set:
 
 
 def wanted_elements(text: str) -> set:
-    """Which elements an advice line accepts. "Fire, never Shock" accepts fire only,
+    """Which elements an advice line accepts. "Fire" accepts fire only,
     "None" accepts a plain gun."""
     if text == "None":
         return {None}

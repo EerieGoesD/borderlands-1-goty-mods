@@ -1,8 +1,11 @@
 # Enemy Weakness Indicator
 
-Shows the best weapon type and element for the enemy under your crosshair.
+Shows the best weapon type, element and weak spot for the enemy under your crosshair.
 
-One line below the crosshair, such as `Shotgun / Fire`, while an enemy is targeted.
+One line below the crosshair, such as `Shotgun / Fire / head`, while an enemy is targeted.
+The element is None when no element beats a plain gun. The weak spot is the body part
+the game marks as critical, with how many times the damage a hit there does, such as
+`pods x300`.
 
 ## Install
 

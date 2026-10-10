@@ -53,7 +53,19 @@ def without_ours(text: str) -> str:
 DisregardAccuracy = BoolOption("Disregard Accuracy", True, "Yes", "No")
 DisregardCritical = BoolOption("Disregard Critical", True, "Yes", "No")
 DisregardElements = BoolOption("Disregard Elements", False, "Yes", "No")
+DisregardZigZag = BoolOption(
+    "Disregard Zig-Zag Bullets",
+    False,
+    "Yes",
+    "No",
+    description=(
+        "Some guns, such as the Madjack, fire bullets that zig-zag and miss most shots."
+        " Yes scores them by how often those bullets can hit, which puts them near the"
+        " bottom. No scores them as if every shot lands."
+    ),
+)
 FontSize = SliderOption("Score font size", 9, 0, 24, 1, True)
+ScoreShields = BoolOption("Score Shields", True, "Enable", "Disable")
 Breather = SliderOption(
     "Breather Seconds",
     10,
@@ -459,10 +471,27 @@ def body_size() -> tuple[float, float]:
         return 2.0 * BODY_RADIUS, 2.0 * BODY_HALF_HEIGHT
 
 
-def straight_share(weapon: UObject) -> float:
-    """How much of its flight a bullet spends inside a human-sized body.
+# Each gun's share worked out so far, by the gun's parts as text. Only numbers and
+# text are kept, never the game's objects.
+shares: dict[str, float] = {}
 
-    A straight bullet is always inside, so 1. A bullet that swings like a wave is
+
+def straight_share(weapon: UObject) -> float:
+    """How much of its flight a bullet spends inside a human-sized body, worked out
+    once for each gun."""
+    try:
+        key = f"{weapon.DefinitionData}|{weapon.TechLevel}"
+    except Exception:
+        return 1.0
+    share = shares.get(key)
+    if share is None:
+        share = work_out_share(weapon)
+        shares[key] = share
+    return share
+
+
+def work_out_share(weapon: UObject) -> float:
+    """A straight bullet is always inside, so 1. A bullet that swings like a wave is
     inside only while the wave is near its middle, which is what asin gives.
     """
     mode = usual_firing_mode(weapon)
@@ -501,7 +530,8 @@ def get_dps(movie: UObject, card: str, weapon: UObject) -> float | None:
 
     shot_damage = damage * max(projectiles, 1)
     # A bullet that swings on its way misses most of the time, whatever the card says.
-    shot_damage *= straight_share(weapon)
+    share = straight_share(weapon) if DisregardZigZag.value is True else 1.0
+    shot_damage *= share
     if DisregardAccuracy.value is False:
         shot_damage *= read_accuracy(movie, card) / 100
     if DisregardCritical.value is False:
@@ -526,7 +556,7 @@ def get_dps(movie: UObject, card: str, weapon: UObject) -> float | None:
     if DisregardElements.value is True:
         return bullets
 
-    return bullets + read_element_dps(weapon, rounds / span)
+    return bullets + read_element_dps(weapon, rounds / span) * share
 
 
 def get_ui_stats(item: UObject) -> dict[str, float]:
@@ -544,6 +574,8 @@ def get_ui_stats(item: UObject) -> dict[str, float]:
 
 def get_shield_score(item: UObject) -> float | None:
     """The shield's capacity plus what it gets back in one breather, at most a full bar."""
+    if ScoreShields.value is False:
+        return None
     stats = get_ui_stats(item)
     capacity = stats.get("ShieldMaxValue")
     rate = stats.get("ShieldOnIdleRegenerationRate")
@@ -628,6 +660,22 @@ def mark(score: float, best: float | None) -> str:
     return f'<font color="{SAME}">=</font>'
 
 
+# What each gun you carry scores, with its type and element, by the gun's name and
+# the settings that change a score. Moving through the list then reads these
+# instead of working every gun out again. Emptied whenever the list is built again.
+# Only numbers and text are kept, never the game's objects.
+carried_scores: dict[str, tuple[float | None, str | None, str | None]] = {}
+
+
+def carried_facts(item: UObject) -> tuple[float | None, str | None, str | None]:
+    key = f"{item}|{DisregardCritical.value}|{DisregardElements.value}|{DisregardZigZag.value}"
+    facts = carried_scores.get(key)
+    if facts is None:
+        facts = (get_dps(None, "", item), read_kind(item), read_element(item))
+        carried_scores[key] = facts
+    return facts
+
+
 def comparison_line(weapon: UObject, score: float) -> str | None:
     """One line saying how the gun stands against the best you carry."""
     kind = read_kind(weapon)
@@ -643,12 +691,12 @@ def comparison_line(weapon: UObject, score: float) -> str | None:
     for other in carried_weapons():
         if other is weapon:
             continue
-        theirs = get_dps(None, "", other)
+        theirs, other_kind, other_element = carried_facts(other)
         if theirs is None:
             continue
 
-        same_kind = kind is not None and read_kind(other) == kind
-        same_element = read_element(other) == element
+        same_kind = kind is not None and other_kind == kind
+        same_element = other_element == element
 
         groups = ["All"]
         if same_kind:
@@ -968,7 +1016,7 @@ def item_score(item: UObject) -> float:
     Only guns have a DPS, so shields and everything else go below them.
     """
     if is_weapon(item):
-        score = get_dps(None, "", item)
+        score = carried_facts(item)[0]
         return 0.0 if score is None else score
     return 0.0
 
@@ -1040,6 +1088,7 @@ def on_sorting(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
+    carried_scores.clear()
     add_dps_page(obj)
 
 
@@ -1405,8 +1454,10 @@ build_mod(
         DisregardAccuracy,
         DisregardCritical,
         DisregardElements,
+        DisregardZigZag,
         ShowComparison,
         FontSize,
+        ScoreShields,
         Breather,
         CleanUp,
     ],

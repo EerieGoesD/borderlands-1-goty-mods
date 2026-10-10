@@ -428,7 +428,7 @@ def on_render(
         x += paint(canvas, x, y, " / ", colours["white"])
         paint(canvas, x, y, element, element_colour)
     except Exception as ex:
-        logging.dev_warning(f"[Enemy Weakness] could not draw ({ex})")
+        logging.dev_warning(f"[Enemy Weakness Indicator] could not draw ({ex})")
 
 
 # Gets populated from `build_mod` below
@@ -443,4 +443,4 @@ build_mod(
     settings_file=Path(f"{SETTINGS_DIR}/EnemyWeakness.json"),
 )
 
-logging.info(f"Enemy Weakness Loaded: {__version__}, {__version_info__}")
+logging.info(f"Enemy Weakness Indicator Loaded: {__version__}, {__version_info__}")

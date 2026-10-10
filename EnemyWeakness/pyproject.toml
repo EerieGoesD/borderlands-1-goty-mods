@@ -1,6 +1,6 @@
 [project]
 name = "EnemyWeakness"
-version = "1.2.0"
+version = "1.2.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Shows the best weapon type and element for the enemy under your crosshair.
 
@@ -10,7 +10,7 @@ For full information about this mod and to report bugs, please visit: https://ee
 "Info and bug reports" = "https://eeriegoesd.com/gaming/mods/"
 
 [tool.sdkmod]
-name = "Enemy Weakness"
+name = "Enemy Weakness Indicator"
 mod_type = "Standard"
 supported_games = ["BL1", "BL1E"]
 coop_support = "Unknown"

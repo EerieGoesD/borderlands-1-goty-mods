@@ -1077,32 +1077,70 @@ def name_dps_page() -> None:
             logging.dev_warning(f"[{LABEL}] could not name the score pages ({ex})")
 
 
-def add_dps_page(movie: UObject) -> None:
-    """Gives the backpack screen the extra pages to cycle through."""
-    try:
-        configs = list(movie.SortConfigurations)
-        last = max(index for index, _key, _name, _show in PAGES)
-        if len(configs) <= last:
-            while len(configs) <= last:
-                configs.append(configs[0])
-            movie.SortConfigurations = configs
-            configs = list(movie.SortConfigurations)
+# The backpack screen's template, which every opening of the backpack is copied
+# from. Giving it the extra pages means each new backpack starts with them.
+MENU_TEMPLATE = "menus_ingame_redux.FlashInstances.status_menu_instance"
 
-        changed = False
-        for index, key, _name, _show in PAGES:
-            page = configs[index]
-            if str(page.SortTitleLookupKey) == key:
-                continue
-            page.SortType = PLAIN_SORT
-            page.FilterType = NO_FILTER
-            page.CategoryType = NO_HEADINGS
-            page.SortTitleLookupKey = key
-            configs[index] = page
-            changed = True
-        if changed:
-            movie.SortConfigurations = configs
+
+def plain(value) -> int:
+    """An enum value as a plain number."""
+    return int(getattr(value, "value", value))
+
+
+def full_page_list() -> list | None:
+    """All the pages, built new: the game's own four, read off the game's untouched
+    defaults, then the extra ones. Copying the game's entries over and changing them
+    in place left their names pointing at freed memory, which showed as ?INT?."""
+    try:
+        defaults = unrealsdk.find_class("StatusMenuExGFxMovie").ClassDefaultObject
+        own = [
+            (plain(c.SortType), plain(c.FilterType), plain(c.CategoryType), str(c.SortTitleLookupKey))
+            for c in defaults.SortConfigurations
+        ]
+    except Exception as ex:
+        logging.dev_warning(f"[{LABEL}] could not read the game's pages ({ex})")
+        return None
+    first_extra = min(index for index, _key, _name, _show in PAGES)
+    own = own[:first_extra]
+    extra = [(PLAIN_SORT, NO_FILTER, NO_HEADINGS, key) for _index, key, _name, _show in sorted(PAGES)]
+    return [
+        unrealsdk.make_struct(
+            "SortFilterConfiguration",
+            SortType=sort_type,
+            FilterType=filter_type,
+            CategoryType=category_type,
+            SortTitleLookupKey=key,
+        )
+        for sort_type, filter_type, category_type, key in own + extra
+    ]
+
+
+def has_pages(movie: UObject) -> bool:
+    try:
+        keys = [str(c.SortTitleLookupKey) for c in movie.SortConfigurations]
+    except Exception:
+        return False
+    return all(index < len(keys) and keys[index] == key for index, key, _name, _show in PAGES)
+
+
+def add_dps_page(movie: UObject) -> None:
+    """Gives a backpack screen the extra pages to cycle through, if it lacks them."""
+    if has_pages(movie):
+        return
+    pages = full_page_list()
+    if pages is None:
+        return
+    try:
+        movie.SortConfigurations = pages
     except Exception as ex:
         logging.dev_warning(f"[{LABEL}] could not add the score pages ({ex})")
+
+
+def add_pages_to_template() -> None:
+    try:
+        add_dps_page(unrealsdk.find_object("StatusMenuExGFxMovie", MENU_TEMPLATE))
+    except Exception:
+        pass
 
 
 @hook(hook_func="WillowGame.StatusMenuExGFxMovie:SortContainer", hook_type=Type.PRE)
@@ -1113,6 +1151,7 @@ def on_sorting(
     __func: BoundFunction,
 ) -> None:
     carried_scores.clear()
+    add_pages_to_template()
     add_dps_page(obj)
 
 
@@ -1574,6 +1613,7 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 name_dps_page()
+add_pages_to_template()
 
 build_mod(
     options=[

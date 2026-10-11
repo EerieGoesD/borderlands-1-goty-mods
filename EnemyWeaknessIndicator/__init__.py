@@ -6,6 +6,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from .elements import ELEMENT_BY_ENEMY
+from .guns import GUN_BY_ENEMY
 from .weakspots import WEAK_SPOT_BY_ENEMY
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
 
@@ -247,16 +248,19 @@ def advice_for(pawn: UObject) -> tuple[str, str, str] | None:
     except Exception:
         pass
 
-    gun, element = NAMED.get(name) or ADVICE[kind_of(path, name)]
+    named = NAMED.get(name)
+    gun, element = named or ADVICE[kind_of(path, name)]
 
-    # The element comes from the game's own data for this exact enemy when there is
-    # one. Shields that bandits carry as items are not in that data, so their reminder
-    # to shock a shield stays.
+    # The gun type and element come from the game's own data for this exact enemy
+    # when there is one. Named bosses keep their own gun. Shields that bandits carry
+    # as items are not in that data, so their reminder to shock a shield stays.
     spot = ""
     try:
         full_path = balance._path_name()
         worked_out = ELEMENT_BY_ENEMY.get(full_path)
         spot = WEAK_SPOT_BY_ENEMY.get(full_path, "")
+        if named is None:
+            gun = GUN_BY_ENEMY.get(full_path, gun)
     except Exception:
         worked_out = None
     if worked_out:

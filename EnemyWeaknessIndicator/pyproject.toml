@@ -1,6 +1,6 @@
 [project]
 name = "EnemyWeaknessIndicator"
-version = "1.3.0"
+version = "1.4.0"
 authors = [{ name = "eeriegoesd" }]
 description = """Shows the best weapon type, element and weak spot for the enemy under your crosshair.
 

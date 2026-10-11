@@ -2,6 +2,8 @@
 
 Shows the full amount of money you carry on screen, past the 9,999,999 the game displays.
 
+The game can hold up to $2,147,483,647. Money that goes past that is kept at that top.
+
 ## Install
 
 Copy the mod's folder into `Borderlands\sdk_mods`, then start the game. It appears in

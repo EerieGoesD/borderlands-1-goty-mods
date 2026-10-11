@@ -6,14 +6,17 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
+from mods_base import SETTINGS_DIR, Game, build_mod, get_pc, hook
 
 LABEL = "Full Money Indicator"
 FONT = "ui_fonts.font_willowbody_18pt"
 GOLD = (255, 210, 0)
 
 # How far the amount sits above the bottom of the screen, in pixels at 1920x1080.
-BOTTOM_MARGIN = 60
+# Enhanced puts its level and XP bar lower, so the amount goes under that bar there.
+# Older copies of the SDK do not know Enhanced by name, so it is asked for carefully.
+ON_ENHANCED = getattr(Game, "BL1E", None) is not None and Game.get_current() is Game.BL1E
+BOTTOM_MARGIN = 18 if ON_ENHANCED else 60
 
 # The screen size the text is sized for. Other sizes scale it to match.
 BASE_WIDTH = 1920.0
@@ -21,6 +24,10 @@ BASE_HEIGHT = 1080.0
 
 # How often the amount is read again, in seconds.
 READ_SECONDS = 0.25
+
+# The most money the game can hold. One more dollar and the game's own count wraps
+# round to a large negative number, so a negative count is put back to this top.
+MOST_MONEY = 2147483647
 
 font = None
 colour = None
@@ -37,7 +44,13 @@ read_at = 0.0
 def read_money() -> int | None:
     pc = get_pc()
     try:
-        return int(pc.PlayerReplicationInfo.CurrencyOnHand)
+        pri = pc.PlayerReplicationInfo
+        amount = int(pri.CurrencyOnHand)
+        if amount < 0:
+            pri.CurrencyOnHand = MOST_MONEY
+            amount = MOST_MONEY
+            logging.info(f"[{LABEL}] money had gone past the top and turned negative, put back to ${MOST_MONEY:,}")
+        return amount
     except Exception:
         return None
 

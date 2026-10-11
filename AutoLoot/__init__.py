@@ -7,7 +7,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
-from mods_base.options import BoolOption, SliderOption
+from mods_base.options import BoolOption, ButtonOption, SliderOption
 
 # The game measures in its own units. Fifty of them make a metre.
 UNITS_PER_METRE = 50.0
@@ -158,12 +158,43 @@ def on_render(
             continue
 
 
+def loot_everything(option) -> None:
+    """Takes every item lying in the area, however far away and whatever kind, except
+    what you are full up on and, when the setting says so, gear you cannot use."""
+    me = on_foot()
+    pc = get_pc()
+    if me is None or pc is None:
+        return
+
+    taken = 0
+    for pickup in unrealsdk.find_all("WillowPickup"):
+        try:
+            if pickup.bPickupable is not True or pickup.Inventory is None:
+                continue
+            if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
+                continue
+            if kind_of(pickup) != "gear" or LootUnusable.value is not True:
+                if pickup.Inventory.CanBeUsedBy(me) is not True:
+                    continue
+            # The game's own hand-over, which works from any distance. The key-press
+            # pick up used while walking only takes what is right next to you.
+            pickup.GiveTo(me, False)
+            taken += 1
+        except Exception:
+            continue
+    logging.info(f"[Auto Loot] looted {taken} items in the area")
+
+
+LootAll = ButtonOption("Loot Everything in the Area", on_press=loot_everything)
+
+
 # Gets populated from `build_mod` below
 __version__: str
 __version_info__: tuple[int, ...]
 
 build_mod(
     options=[
+        LootAll,
         LootWeapons,
         LootMoney,
         LootAmmo,

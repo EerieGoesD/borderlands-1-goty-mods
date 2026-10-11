@@ -99,8 +99,8 @@ ShowComparison = BoolOption(
     ),
 )
 
-# How many things to walk through before giving up, so a huge backpack cannot
-# hold the menu up.
+# How many links of an equipped chain to follow before giving up, so a chain that
+# loops back on itself cannot hold the menu up. The backpack itself is read in full.
 CARRY_LIMIT = 300
 
 BETTER = "#7ce87c"
@@ -608,16 +608,15 @@ def carried_weapons() -> list[UObject]:
             if isinstance(held, UObject):
                 # A chain, each gun pointing at the next.
                 item = held
-                while item is not None and len(found) < CARRY_LIMIT:
+                links = 0
+                while item is not None and links < CARRY_LIMIT:
                     found.append(item)
+                    links += 1
                     item = getattr(item, "Inventory", None)
             else:
                 for item in held:
-                    if item is None:
-                        continue
-                    found.append(item)
-                    if len(found) >= CARRY_LIMIT:
-                        break
+                    if item is not None:
+                        found.append(item)
         except Exception:
             continue
 
@@ -1278,8 +1277,10 @@ def carried_items() -> list[tuple[UObject, bool]]:
     for chain in ("InventoryChain", "ItemChain"):
         try:
             item = getattr(manager, chain, None)
-            while item is not None and len(found) < CARRY_LIMIT:
+            links = 0
+            while item is not None and links < CARRY_LIMIT:
                 found.append((item, True))
+                links += 1
                 item = getattr(item, "Inventory", None)
         except Exception:
             pass
@@ -1288,8 +1289,6 @@ def carried_items() -> list[tuple[UObject, bool]]:
         for item in manager.Backpack:
             if item is not None:
                 found.append((item, False))
-            if len(found) >= CARRY_LIMIT:
-                break
     except Exception:
         pass
 

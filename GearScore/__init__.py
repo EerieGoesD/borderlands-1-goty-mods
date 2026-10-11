@@ -1020,8 +1020,19 @@ def item_score(item: UObject) -> float:
     return 0.0
 
 
-# The extra page you reach with Page Up and Page Down in the backpack.
+# The extra pages you reach with Page Up and Page Down in the backpack, after the
+# game's own four: where each sits, the key its name is looked up by, the name, and
+# what it shows.
 DPS_PAGE = 4
+PAGES = [
+    (4, "DPSSort", "DPS", "dps"),
+    (5, "NameSort", "Name A-Z", "name"),
+    (6, "CorrosiveSort", "Corrosive", "corrosive"),
+    (7, "IncendiarySort", "Incendiary", "incendiary"),
+    (8, "ShockSort", "Shock", "shock"),
+    (9, "ExplosiveSort", "Explosive", "explosive"),
+]
+PAGE_BY_INDEX = {index: show for index, _key, _name, show in PAGES}
 
 # What the page is built from: the plain backpack sort, nothing filtered out,
 # and no headings, so everything sits in one straight list.
@@ -1032,52 +1043,66 @@ NO_HEADINGS = 0
 # A line holding a real thing, rather than a heading.
 ROW_KIND = 0
 
-# The name written above the page. The game keeps its menu wording in text files
-# under the game folder, so the name is added there once and looked up by this key.
-PAGE_KEY = "DPSSort"
-PAGE_NAME = "DPS"
+# The names written above the pages. The game keeps its menu wording in text files
+# under the game folder, so each name is added there once and looked up by its key.
 PAGE_SECTION = "[StatusMenu]"
 
 
 def name_dps_page() -> None:
-    """Adds the page name to the game's wording files, if it is not there yet."""
+    """Adds the page names to the game's wording files, where they are not there yet."""
     folder = Path(__file__).parents[2] / "WillowGame" / "Localization"
     for text_file in folder.glob("*/WillowGame.*"):
         try:
-            lines = text_file.read_text(encoding="utf-8", errors="replace").splitlines()
-            if any(line.startswith(f"{PAGE_KEY}=") for line in lines):
-                continue
+            # Read and written as raw text, so the file keeps plain Windows line
+            # endings. Letting Python turn the line breaks over doubled them.
+            with open(text_file, encoding="utf-8", errors="replace", newline="") as source:
+                lines = source.read().replace("\r\r\n", "\r\n").split("\r\n")
+            if lines and lines[-1] == "":
+                lines.pop()
             if PAGE_SECTION not in lines:
+                continue
+            missing = [
+                f"{key}={name}"
+                for _index, key, name, _show in PAGES
+                if not any(line.startswith(f"{key}=") for line in lines)
+            ]
+            if not missing:
                 continue
 
             place = lines.index(PAGE_SECTION) + 1
-            lines.insert(place, f"{PAGE_KEY}={PAGE_NAME}")
-            text_file.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+            lines[place:place] = missing
+            with open(text_file, "w", encoding="utf-8", newline="") as target:
+                target.write("\r\n".join(lines) + "\r\n")
         except Exception as ex:
-            logging.dev_warning(f"[{LABEL}] could not name the score page ({ex})")
+            logging.dev_warning(f"[{LABEL}] could not name the score pages ({ex})")
 
 
 def add_dps_page(movie: UObject) -> None:
-    """Gives the backpack screen one more page to cycle through."""
+    """Gives the backpack screen the extra pages to cycle through."""
     try:
         configs = list(movie.SortConfigurations)
-        if len(configs) <= DPS_PAGE:
-            configs.append(configs[0])
+        last = max(index for index, _key, _name, _show in PAGES)
+        if len(configs) <= last:
+            while len(configs) <= last:
+                configs.append(configs[0])
             movie.SortConfigurations = configs
             configs = list(movie.SortConfigurations)
 
-        page = configs[DPS_PAGE]
-        if str(page.SortTitleLookupKey) == PAGE_KEY:
-            return
-
-        page.SortType = PLAIN_SORT
-        page.FilterType = NO_FILTER
-        page.CategoryType = NO_HEADINGS
-        page.SortTitleLookupKey = PAGE_KEY
-        configs[DPS_PAGE] = page
-        movie.SortConfigurations = configs
+        changed = False
+        for index, key, _name, _show in PAGES:
+            page = configs[index]
+            if str(page.SortTitleLookupKey) == key:
+                continue
+            page.SortType = PLAIN_SORT
+            page.FilterType = NO_FILTER
+            page.CategoryType = NO_HEADINGS
+            page.SortTitleLookupKey = key
+            configs[index] = page
+            changed = True
+        if changed:
+            movie.SortConfigurations = configs
     except Exception as ex:
-        logging.dev_warning(f"[{LABEL}] could not add the score page ({ex})")
+        logging.dev_warning(f"[{LABEL}] could not add the score pages ({ex})")
 
 
 @hook(hook_func="WillowGame.StatusMenuExGFxMovie:SortContainer", hook_type=Type.PRE)
@@ -1098,9 +1123,11 @@ def on_sorted(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Puts the list in order of how good each thing is, best first."""
+    """Orders the list for the extra pages: best first on DPS and the element pages,
+    which show only guns of their element, and alphabetical on the name page."""
     try:
-        if int(obj.LeftSideSortConfigIndex) != DPS_PAGE:
+        show = PAGE_BY_INDEX.get(int(obj.LeftSideSortConfigIndex))
+        if show is None:
             return
 
         container = __args.Container
@@ -1110,15 +1137,37 @@ def on_sorted(
         # end up copying a row over one it still needs.
         entries = [(int(entry.ArrayIdx), int(entry.Kind)) for entry in container.TextEntries]
 
-        def rank(entry: tuple[int, int]) -> float:
-            place, kind = entry
-            if kind != ROW_KIND:
-                return float("inf")
-            return item_score(rows[place].Data)
+        if show == "name":
+            def by_name(entry: tuple[int, int]) -> str:
+                place, kind = entry
+                if kind != ROW_KIND:
+                    return ""
+                try:
+                    return str(rows[place].Text).lower()
+                except Exception:
+                    return ""
+
+            ordered = sorted(entries, key=by_name)
+        else:
+            if show != "dps":
+                def of_element(entry: tuple[int, int]) -> bool:
+                    place, kind = entry
+                    item = rows[place].Data
+                    return kind == ROW_KIND and is_weapon(item) and carried_facts(item)[2] == show
+
+                entries = [entry for entry in entries if of_element(entry)]
+
+            def rank(entry: tuple[int, int]) -> float:
+                place, kind = entry
+                if kind != ROW_KIND:
+                    return float("inf")
+                return item_score(rows[place].Data)
+
+            ordered = sorted(entries, key=rank, reverse=True)
 
         container.TextEntries = [
             unrealsdk.make_struct("GFxTextEntry", ArrayIdx=place, Kind=kind)
-            for place, kind in sorted(entries, key=rank, reverse=True)
+            for place, kind in ordered
         ]
         container.UpdateTextEntries()
     except Exception as ex:
@@ -1295,6 +1344,21 @@ def carried_items() -> list[tuple[UObject, bool]]:
     return found
 
 
+def item_type(item: UObject) -> str | None:
+    """What sort of class mod or grenade mod it is, from the two words of its name
+    that say so, such as Leader Class Mod or Explosive Rain. The maker, the grade
+    and the model number are left out, so a 360 and a 660 Leader Class Mod match."""
+    try:
+        data = item.DefinitionData
+        prefix = data.PrefixItemNamePartDefinition
+        title = data.TitleItemNamePartDefinition
+        words = [str(part.PartName) for part in (prefix, title) if part is not None]
+    except Exception:
+        return None
+    words = [w for w in words if w]
+    return " ".join(words) if words else None
+
+
 def describe(item: UObject, equipped: bool, pc: UObject, pawn: UObject | None) -> dict:
     """Everything the clean up needs to know about one item, read once."""
     kind = item_kind(item)
@@ -1324,11 +1388,12 @@ def describe(item: UObject, equipped: bool, pc: UObject, pawn: UObject | None) -
         facts["element"] = read_element(item)
     elif kind == "shield":
         facts["score"] = get_shield_score(item)
-    elif kind == "class mod":
+    elif kind in ("class mod", "grenade mod"):
         try:
             facts["price"] = int(item.CashValue)
         except Exception:
             facts["price"] = None
+        facts["sort"] = item_type(item)
 
     return facts
 
@@ -1336,12 +1401,13 @@ def describe(item: UObject, equipped: bool, pc: UObject, pawn: UObject | None) -
 def plan_clean_up(carried: list[dict]) -> list[dict]:
     """Which of the items you carry should go, equipped or not.
 
-    Shields: only the highest Shield Power stays. Class mods: only the most expensive one
-    your character can use stays. Weapons: a gun stays while it is the best of its
-    type, the best of its element, or the best of its type and element together,
-    the way the card's comparison marks it, with ties kept. Class mods for other
-    characters go. Grenade mods and everything else are left alone. Anything your
-    level is too low for is neither counted nor dropped.
+    Shields: only the highest Shield Power stays. Class mods and grenade mods: the
+    most expensive one of each sort stays, such as one Leader Class Mod and one
+    Explosive Rain, and the cheaper copies go. Class mods for other characters go.
+    Weapons: a gun stays while it is the best of its type, the best of its element,
+    or the best of its type and element together, the way the card's comparison
+    marks it, with ties kept. Everything else is left alone. Anything your level is
+    too low for is neither counted nor dropped.
     """
     going: list[dict] = []
     carried = [f for f in carried if not f["level_locked"]]
@@ -1354,18 +1420,26 @@ def plan_clean_up(carried: list[dict]) -> list[dict]:
             if facts["score"] < top:
                 going.append(facts)
 
-    # Class mods: another character's go, the priciest of yours stays.
+    # Class mods: another character's go.
     mods = [f for f in carried if f["kind"] == "class mod"]
     for facts in mods:
         if not facts["usable"]:
             going.append(facts)
-    yours = [f for f in mods if f["usable"] and f["price"] is not None]
-    if yours:
-        priciest = max(f["price"] for f in yours)
-        keeper = next(f for f in yours if f["price"] == priciest)
-        for facts in yours:
-            if facts is not keeper:
-                going.append(facts)
+
+    # Class mods and grenade mods you can use: the priciest of each sort stays.
+    keepers: dict[tuple[str, str], dict] = {}
+    copies = [
+        f
+        for f in carried
+        if f["kind"] in ("class mod", "grenade mod") and f["usable"] and f["price"] is not None and f["sort"]
+    ]
+    for facts in copies:
+        key = (facts["kind"], facts["sort"])
+        if key not in keepers or facts["price"] > keepers[key]["price"]:
+            keepers[key] = facts
+    for facts in copies:
+        if keepers[(facts["kind"], facts["sort"])] is not facts:
+            going.append(facts)
 
     # Weapons, scored the way the card prints them.
     guns = [f for f in carried if f["kind"] == "weapon" and f["usable"] and f["score"] is not None and f["type"] is not None]
@@ -1391,17 +1465,37 @@ def plan_clean_up(carried: list[dict]) -> list[dict]:
     return going
 
 
-def clean_up() -> None:
-    """Drops everything the plan says, here and now."""
+# How many items are thrown each frame. Throwing a whole backpack's worth at once
+# took the game down, so it is done a few at a time over several frames.
+DROPS_PER_FRAME = 4
+
+# Whether a clean up is under way. Only this flag is kept between frames, never the
+# items: each frame works out the plan again from what you carry right then.
+cleaning = False
+dropped_so_far = 0
+
+
+def item_label(facts: dict) -> str:
+    try:
+        name = str(facts["item"].ItemName)
+    except Exception:
+        name = ""
+    return f"{facts['kind']} {name or facts.get('sort') or ''}{' (equipped)' if facts['equipped'] else ''}"
+
+
+def clean_up_step() -> bool:
+    """Throws the next few items the plan says should go. Says whether more remain."""
+    global dropped_so_far
+
     pc = get_pc()
     if pc is None or pc.Pawn is None:
-        return
+        return False
 
-    # Everything is read and dropped in this one go. Holding an item until a
-    # later frame takes the game down once the game has let go of it.
     pawn = pc.Pawn
     carried = [describe(item, equipped, pc, pawn) for item, equipped in carried_items()]
     going = plan_clean_up(carried)
+    if not going:
+        return False
 
     # The game's own Drop throws the item and then takes it off the backpack
     # list. Without the second step the backpack screen keeps showing it until
@@ -1412,17 +1506,49 @@ def clean_up() -> None:
     except Exception:
         manager = None
 
-    dropped = 0
-    for facts in going:
+    before = dropped_so_far
+    for facts in going[:DROPS_PER_FRAME]:
+        logging.info(f"[{LABEL}] clean up dropping {item_label(facts)}")
         try:
             pc.ThrowInventory(facts["item"], 1)
             if manager is not None and not facts["equipped"]:
                 manager.RemoveInventoryFromBackpack(facts["item"])
-            dropped += 1
+            dropped_so_far += 1
         except Exception as ex:
             logging.dev_warning(f"[{LABEL}] could not drop an item ({ex})")
+    # Nothing would go this time, so trying again next frame would only repeat it.
+    if dropped_so_far == before:
+        return False
+    return len(going) > DROPS_PER_FRAME
 
-    logging.info(f"[{LABEL}] clean up dropped {dropped} of {len(carried)} items")
+
+@hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
+def on_clean_tick(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    global cleaning, dropped_so_far
+
+    if not cleaning:
+        return
+    try:
+        more = clean_up_step()
+    except Exception as ex:
+        logging.dev_warning(f"[{LABEL}] clean up stopped ({ex})")
+        more = False
+    if not more:
+        cleaning = False
+        logging.info(f"[{LABEL}] clean up dropped {dropped_so_far} items")
+        dropped_so_far = 0
+
+
+def clean_up() -> None:
+    """Starts a clean up. The items go a few at a time, from the next frame on."""
+    global cleaning, dropped_so_far
+    dropped_so_far = 0
+    cleaning = True
 
 
 def on_clean_up(option) -> None:
@@ -1433,11 +1559,12 @@ CleanUp = ButtonOption(
     "Clean Up Inventory",
     on_press=on_clean_up,
     description=(
-        "Drops every shield but the one with the highest Shield Power, every class mod"
-        " but the most expensive one, and every gun that is not your best of its type,"
-        " its element, or both. Equipped items count too. Class mods for other characters"
-        " are dropped. Anything your level is too low for is neither counted nor dropped."
-        " Grenade mods are left alone."
+        "Drops every shield but the one with the highest Shield Power, and every gun that"
+        " is not your best of its type, its element, or both. Of each sort of class mod"
+        " and grenade mod, such as a Leader Class Mod or an Explosive Rain, the most"
+        " expensive one stays and the cheaper copies are dropped. Equipped items count"
+        " too. Class mods for other characters are dropped. Anything your level is too"
+        " low for is neither counted nor dropped."
     ),
 )
 
@@ -1475,6 +1602,7 @@ build_mod(
         on_pickup_card,
         on_fire,
         on_pool_tick,
+        on_clean_tick,
         on_sorting,
         on_sorted,
         *(ENHANCED_ONLY if ON_ENHANCED else ()),

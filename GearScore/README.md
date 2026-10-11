@@ -4,7 +4,8 @@ Rates every weapon by DPS and shield by Shield Power according to in-game formul
 
 The number shows on item cards in your backpack, in vending machines, on mission rewards
 and on loot lying on the ground. Page Up and Page Down in the backpack shows a DPS page,
-listing everything you carry best first.
+listing everything you carry best first, a Name A-Z page, and one page each for
+Corrosive, Incendiary, Shock and Explosive guns, best first.
 
 Weapons: `shots x damage x pellets / (shots x fire interval + reload)`, where shots is
 the magazine divided by the ammo each shot costs. A gun whose bullets swing on their
@@ -24,7 +25,7 @@ differ slightly from the card.
 - **Score font size**: How big the number is printed on the card.
 - **Score Shields**: Shows Shield Power on shield cards. Turn it off and shields get no score, and Clean Up leaves them alone.
 - **Breather Seconds**: How many seconds you expect to be out of fire between bursts in a fight. Shield Power is the shield's capacity plus whatever it recharges in that time, after its recharge delay, and never more than one full bar. At 0 shields are rated by capacity alone.
-- **Clean Up Inventory**: Drops every shield but the one with the highest Shield Power, every class mod but the most expensive one, and every gun that is not your best of its type, its element, or both. Equipped items count too. Class mods for other characters are dropped. Anything your level is too low for is neither counted nor dropped. Grenade mods are left alone.
+- **Clean Up Inventory**: Drops every shield but the one with the highest Shield Power, and every gun that is not your best of its type, its element, or both. Of each sort of class mod and grenade mod, such as a Leader Class Mod or an Explosive Rain, the most expensive one stays and the cheaper copies are dropped. Equipped items count too. Class mods for other characters are dropped. Anything your level is too low for is neither counted nor dropped.
 
 ## Install
 

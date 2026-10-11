@@ -1,6 +1,6 @@
 [project]
 name = "FullMoneyIndicator"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Shows the full amount of money you carry on screen, past the 9,999,999 the game displays.
 

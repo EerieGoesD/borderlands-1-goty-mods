@@ -3,7 +3,7 @@
 Shows the best weapon type, element and weak spot for the enemy under your crosshair.
 
 One line below the crosshair, such as `Shotgun / Fire / head`, while an enemy is targeted.
-The element is None when no element beats a plain gun. The weak spot is the body part
+The gun type comes from the game's own data: whether the enemy flies, how big it is, whether it fights up close or with a gun, and how much its weak spot pays. The element is None when no element beats a plain gun. The weak spot is the body part
 the game marks as critical, with how many times the damage a hit there does, such as
 `pods x300`.
 

@@ -5,7 +5,7 @@ from unrealsdk import logging  # type: ignore
 from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
-from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
+from mods_base import SETTINGS_DIR, build_mod, get_pc, hook, keybind
 from mods_base.options import ButtonOption
 
 # What the game calls a spot that enemies come out of.
@@ -108,6 +108,14 @@ ResetNow = ButtonOption(
 )
 
 
+@keybind("Reset Current Area", "J")
+def on_reset_key() -> None:
+    """The same as the button, from a key in game."""
+    global waiting
+
+    waiting = SETTLING
+
+
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
 def on_render(
     obj: UObject,
@@ -145,7 +153,7 @@ __version_info__: tuple[int, ...]
 
 build_mod(
     options=[ResetNow],
-    keybinds=[],
+    keybinds=[on_reset_key],
     hooks=[on_render],
     commands=[],
     settings_file=Path(f"{SETTINGS_DIR}/ResetEnemies.json"),

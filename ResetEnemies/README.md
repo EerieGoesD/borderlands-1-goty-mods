@@ -5,6 +5,8 @@ Brings the enemies in the area back without reloading your save.
 In the mod's settings, click Reset Current Area. Close the menu and the enemies come
 back at their own spawn points.
 
+Or press J in game. The key can be changed in the mod's keybinds.
+
 ## Install
 
 Copy the mod's folder into `Borderlands\sdk_mods`, then start the game. It appears in

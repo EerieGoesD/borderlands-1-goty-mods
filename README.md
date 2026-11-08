@@ -40,6 +40,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Use No Reload](UseNoReload) | Stops the Use key reloading your gun |
 | [Vehicle Jump](VehicleJump) | Lets you jump while driving |
 | [Vehicle Loot](VehicleLoot) | Picks loot up while you drive |
+| [Viewmodel Changer](ViewmodelChanger) | Sets where your gun sits on screen and its field of view, for each gun type |
 
 ## Install
 

@@ -11,41 +11,52 @@ from mods_base.options import ButtonOption, NestedOption, SliderOption
 
 LABEL = "Viewmodel Changer"
 
-# Every gun type, the group it is set from, and where the game puts it on screen:
-# its field of view, then how far forward, right and up it sits. Read off the game.
-GUN_TYPES = [
-    ("Pistols", "gd_weap_repeater_pistol.A_Weapon.WeaponType_repeater_pistol", 55, -4, 2, 2),
-    ("Pistols", "gd_weap_stock_weapons.A_Weapon.WeaponType_repeater_pistol_stock", 55, 0, 0, 0),
-    ("Pistols", "gd_weap_machine_pistol.A_Weapon.WeaponType_machine_pistol", 55, -2, 2, 4),
-    ("Pistols", "gd_weap_stock_weapons.A_Weapon.WeaponType_machine_pistol_stock", 55, -2, 2, 4),
-    ("Revolvers", "gd_weap_revolver_pistol.A_Weapon.WeaponType_revolver_pistol", 55, -4, 2, 2),
-    ("SMGs", "gd_weap_patrol_smg.A_Weapon.WeaponType_patrol_smg", 45, 0, 0, 0),
-    ("SMGs", "gd_weap_stock_weapons.A_Weapon.WeaponType_patrol_smg_stock", 45, 0, 0, 0),
-    ("Combat Rifles", "gd_weap_combat_rifle.A_Weapon.WeaponType_combat_rifle", 55, 10, 0, 0),
-    ("Combat Rifles", "dlc3_gd_weap_stock.A_Weapon.WeaponType_combat_rifle_stock", 55, 10, 0, 0),
-    ("Combat Rifles", "gd_weap_support_machinegun.A_Weapon.WeaponType_support_machinegun", 55, 10, 0, 0),
-    ("Combat Rifles", "gd_weap_stock_weapons.A_Weapon.WeaponType_support_machinegun_stock", 55, 0, 0, 0),
-    ("Shotguns", "gd_weap_combat_shotgun.A_Weapon.WeaponType_combat_shotgun", 55, 0, 0, 0),
-    ("Shotguns", "gd_weap_stock_weapons.A_Weapon.WeaponType_combat_shotgun_stock", 55, 0, 0, 0),
-    ("Shotguns", "gd_weap_assault_shotgun.A_Weapon.WeaponType_assault_shotgun", 55, 0, 0, 0),
-    ("Sniper Rifles", "gd_weap_sniper_rifle.A_Weapon.WeaponType_sniper_rifle", 55, 3, 3.5, 0),
-    ("Sniper Rifles", "gd_weap_sniper_rifle_semiauto.A_Weapon.WeaponType_sniper_rifle_semiauto", 55, 3, 3.5, 0),
-    ("Launchers", "gd_weap_rocket_launcher.A_Weapon.WeaponType_rocket_launcher", 65, 0, 10, 0),
-    ("Launchers", "gd_weap_grenade_launcher.A_Weapon.WeaponType_grenade_launcher", 65, 0, 0, -16),
-    ("Eridian Weapons", "gd_weap_alien_rifle.A_Rifle.a_weap.WeaponType_Eridan_Elementalgun", 55, 0, 0, 0),
-    ("Eridian Weapons", "dlc3_gd_weap_UniqueParts.EridanRifle.WeaponType_Eridan_Elementalgun", 55, 0, 0, 0),
-    ("Eridian Weapons", "gd_weap_alien_rifle.A_Launcher.a_weap.WeaponType_Eridan_Cannon", 55, 0, 0, 0),
-    ("Eridian Weapons", "gd_weap_alien_rifle.A_Shotgun.a_weap.WeaponType_Eridan_Thunder_Storm", 55, 0, 0, 0),
-    ("Eridian Weapons", "gd_weap_alien_rifle.A_SMG.a_weap.WeaponType_Eridan_Blaster", 55, 0, 0, 0),
-    ("Eridian Weapons", "gd_weap_alien_rifle.A_Sniper.a_weap.WeaponType_Eridan_Lightning", 55, 0, 0, 0),
-]
-
-GROUP_NAMES = list(dict.fromkeys(group for group, *_rest in GUN_TYPES))
+# The groups, each with the gun FOV the game gives its guns.
+GROUP_FOV = {
+    "Pistols": 55,
+    "Revolvers": 55,
+    "SMGs": 45,
+    "Combat Rifles": 55,
+    "Shotguns": 55,
+    "Sniper Rifles": 55,
+    "Launchers": 65,
+    "Eridian Weapons": 55,
+}
 
 # How often the gun in your hands is checked, in seconds, in case the game put its
 # type back to normal, such as after loading an area.
 CHECK_SECONDS = 0.5
 checked_at = 0.0
+
+# Each gun type's own position, read off the game the first time it is in your hands,
+# by the type's name. Other mods' guns get theirs the same way.
+start: dict[str, tuple[float, float, float]] = {}
+
+# The gun FOV a type had before a moved slider changed it, so it can be put back. A
+# slider left at its default never touches the FOV, so another mod's FOV stays.
+fov_before: dict[str, float] = {}
+
+# The group each gun type belongs to, by the type's name.
+group_by_type: dict[str, str | None] = {}
+
+
+def group_of(gun_type: UObject) -> str | None:
+    """Which group a gun type belongs to, from what kind of gun the game marks it as."""
+    if gun_type.bPlasmaWeapon is True:
+        return "Eridian Weapons"
+    if gun_type.bSniperRifle is True:
+        return "Sniper Rifles"
+    if gun_type.bRocketLauncher is True:
+        return "Launchers"
+    if gun_type.bShotgun is True:
+        return "Shotguns"
+    if gun_type.bSMG is True:
+        return "SMGs"
+    if gun_type.bAssaultRifle is True:
+        return "Combat Rifles"
+    if gun_type.bPistol is True:
+        return "Revolvers" if "Ammo_Revolver_Pistol" in str(gun_type.AmmoResource) else "Pistols"
+    return None
 
 
 class Group:
@@ -53,21 +64,22 @@ class Group:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        fov = next(fov for group, _path, fov, *_rest in GUN_TYPES if group == name)
-        self.fov = SliderOption("Gun FOV", fov, 10, 100, 1, True, on_change_anytime=self.changed)
+        self.fov = SliderOption("Gun FOV", GROUP_FOV[name], 10, 100, 1, True, on_change_anytime=self.changed)
         self.forward = SliderOption("Forward and Back", 0, -100, 100, 1, True, on_change_anytime=self.changed)
         self.right = SliderOption("Left and Right", 0, -100, 100, 1, True, on_change_anytime=self.changed)
         self.up = SliderOption("Up and Down", 0, -100, 100, 1, True, on_change_anytime=self.changed)
         self.option = NestedOption(name, [self.fov, self.forward, self.right, self.up])
 
-    def wanted(self) -> tuple[float, float, float, float]:
-        return (self.fov.value, self.forward.value, self.right.value, self.up.value)
+    def wanted(self) -> tuple[float | None, float, float, float]:
+        """The gun FOV, None to leave it alone, then the three moves."""
+        fov = None if self.fov.value == self.fov.default_value else self.fov.value
+        return (fov, self.forward.value, self.right.value, self.up.value)
 
     def changed(self, option: SliderOption, value: float) -> None:
         # Called before the setting takes the new value, so it is put in by hand.
         fov, forward, right, up = self.wanted()
         if option is self.fov:
-            fov = value
+            fov = None if value == self.fov.default_value else value
         elif option is self.forward:
             forward = value
         elif option is self.right:
@@ -76,45 +88,48 @@ class Group:
             up = value
         if not enabled:
             return
-        place_group(self.name, (fov, forward, right, up))
+        for path, group in group_by_type.items():
+            if group == self.name:
+                place(path, (fov, forward, right, up))
         refresh()
 
 
-groups = {name: Group(name) for name in GROUP_NAMES}
+groups = {name: Group(name) for name in GROUP_FOV}
 
 enabled = False
 
 
-def place(path: str, fov: float, x: float, y: float, z: float) -> None:
-    """Sets one gun type's field of view and position, if the game has it loaded."""
+def find_type(path: str) -> UObject | None:
     try:
-        gun_type = unrealsdk.find_object("WeaponTypeDefinition", path)
+        return unrealsdk.find_object("WeaponTypeDefinition", path)
     except Exception:
+        return None
+
+
+def place(path: str, wanted: tuple[float | None, float, float, float]) -> None:
+    """Sets one gun type's FOV and position from its own, if the game has it loaded."""
+    gun_type = find_type(path)
+    if gun_type is None or path not in start:
         return
-    if gun_type is None:
-        return
+    fov, forward, right, up = wanted
+    x, y, z = start[path]
     try:
-        gun_type.FirstPersonMeshFOV = float(fov)
-        gun_type.PlayerViewOffset = unrealsdk.make_struct("Vector", X=float(x), Y=float(y), Z=float(z))
+        if fov is not None:
+            if path not in fov_before:
+                fov_before[path] = float(gun_type.FirstPersonMeshFOV)
+            gun_type.FirstPersonMeshFOV = float(fov)
+        elif path in fov_before:
+            gun_type.FirstPersonMeshFOV = fov_before.pop(path)
+        gun_type.PlayerViewOffset = unrealsdk.make_struct(
+            "Vector", X=float(x + forward), Y=float(y + right), Z=float(z + up),
+        )
     except Exception as ex:
         logging.dev_warning(f"[{LABEL}] could not set {path} ({ex})")
 
 
-def place_group(name: str, wanted: tuple[float, float, float, float]) -> None:
-    fov, forward, right, up = wanted
-    for group, path, _fov, x, y, z in GUN_TYPES:
-        if group == name:
-            place(path, fov, x + forward, y + right, z + up)
-
-
-def place_all() -> None:
-    for name, group in groups.items():
-        place_group(name, group.wanted())
-
-
 def put_back_all() -> None:
-    for _group, path, fov, x, y, z in GUN_TYPES:
-        place(path, fov, x, y, z)
+    for path in group_by_type:
+        place(path, (None, 0, 0, 0))
 
 
 def refresh() -> None:
@@ -123,20 +138,23 @@ def refresh() -> None:
     if pc is None or pc.Pawn is None:
         return
     pawn = pc.Pawn
-    weapon = getattr(pawn, "Weapon", None)
-    if weapon is not None:
-        try:
-            weapon.UpdateForegroundFOV()
-        except Exception as ex:
-            logging.dev_warning(f"[{LABEL}] could not update the gun FOV ({ex})")
+    # The gun FOV goes straight onto the screen's gun view, the same way other FOV mods
+    # do it, so nothing else about the camera is worked out again.
+    try:
+        pc.ForegroundFOV = float(pawn.Weapon.DefinitionData.WeaponTypeDefinition.FirstPersonMeshFOV)
+    except Exception as ex:
+        logging.dev_warning(f"[{LABEL}] could not update the gun FOV ({ex})")
     try:
         pawn.SetArmPosition()
     except Exception as ex:
         logging.dev_warning(f"[{LABEL}] could not move the gun ({ex})")
 
 
-def held_is_off() -> bool:
-    """Whether the gun in your hands is not where the settings put it."""
+def check_held() -> bool:
+    """Puts the gun type in your hands where the settings say, if it is not there.
+
+    Returns whether anything had to change.
+    """
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return False
@@ -145,18 +163,27 @@ def held_is_off() -> bool:
         path = gun_type._path_name()
     except Exception:
         return False
-    for group, known, _fov, x, y, z in GUN_TYPES:
-        if known != path:
-            continue
-        fov, forward, right, up = groups[group].wanted()
+
+    if path not in group_by_type:
+        group_by_type[path] = group_of(gun_type)
         offset = gun_type.PlayerViewOffset
-        return (
-            abs(float(gun_type.FirstPersonMeshFOV) - fov) > 0.01
-            or abs(float(offset.X) - (x + forward)) > 0.01
-            or abs(float(offset.Y) - (y + right)) > 0.01
-            or abs(float(offset.Z) - (z + up)) > 0.01
-        )
-    return False
+        start[path] = (float(offset.X), float(offset.Y), float(offset.Z))
+    group = group_by_type[path]
+    if group is None:
+        return False
+
+    fov, forward, right, up = groups[group].wanted()
+    x, y, z = start[path]
+    offset = gun_type.PlayerViewOffset
+    off = (
+        abs(float(offset.X) - (x + forward)) > 0.01
+        or abs(float(offset.Y) - (y + right)) > 0.01
+        or abs(float(offset.Z) - (z + up)) > 0.01
+        or (fov is not None and abs(float(gun_type.FirstPersonMeshFOV) - fov) > 0.01)
+    )
+    if off:
+        place(path, (fov, forward, right, up))
+    return off
 
 
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
@@ -166,7 +193,7 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Now and then, puts the gun in your hands back where the settings say."""
+    """Now and then, puts the gun in your hands where the settings say."""
     global checked_at
 
     now = time.monotonic()
@@ -175,8 +202,7 @@ def on_render(
     checked_at = now
 
     try:
-        if held_is_off():
-            place_all()
+        if check_held():
             refresh()
     except Exception as ex:
         logging.dev_warning(f"[{LABEL}] could not check the gun ({ex})")
@@ -196,8 +222,8 @@ ResetAll = ButtonOption("Reset to Default", on_press=reset_all)
 def on_enable() -> None:
     global enabled
     enabled = True
-    place_all()
-    refresh()
+    if check_held():
+        refresh()
 
 
 def on_disable() -> None:

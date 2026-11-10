@@ -13,6 +13,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Enemy Weakness Indicator](EnemyWeaknessIndicator) | Shows the best weapon type, element and weak spot for the enemy under your crosshair |
 | [Full Money Indicator](FullMoneyIndicator) | Shows the full amount of money you carry, past the 9,999,999 the game displays |
 | [Gear Score](GearScore) | Rates weapons by DPS and shields by Shield Power, on item cards (character skills not counted) |
+| [HUD Cleaner](HUDCleaner) | Hides the parts of the HUD you pick |
 | [Hide Full Pickups](HideFullPickups) | Ammo you cannot carry stops lighting up |
 | [Infinite Ammo](InfiniteAmmo) | Unlimited ammo. No reload option |
 | [Infinite Health](InfiniteHealth) | God-mode basically |

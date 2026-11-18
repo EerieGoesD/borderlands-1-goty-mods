@@ -28,16 +28,19 @@ GROUP_FOV = {
 CHECK_SECONDS = 0.5
 checked_at = 0.0
 
+# These three are kept when the mod is reloaded from the console: the copy being
+# replaced puts every gun back from them, and it only does so after this file has run.
+
 # Each gun type's own position, read off the game the first time it is in your hands,
 # by the type's name. Other mods' guns get theirs the same way.
-start: dict[str, tuple[float, float, float]] = {}
+start: dict[str, tuple[float, float, float]] = globals().get("start", {})
 
 # The gun FOV a type had before a moved slider changed it, so it can be put back. A
 # slider left at its default never touches the FOV, so another mod's FOV stays.
-fov_before: dict[str, float] = {}
+fov_before: dict[str, float] = globals().get("fov_before", {})
 
 # The group each gun type belongs to, by the type's name.
-group_by_type: dict[str, str | None] = {}
+group_by_type: dict[str, str | None] = globals().get("group_by_type", {})
 
 
 def group_of(gun_type: UObject) -> str | None:
@@ -186,6 +189,28 @@ def check_held() -> bool:
     return off
 
 
+# Whether the gun in your hands is aimed down its sights. While it is, the gun sits
+# where the game puts it, since the sights only line up there.
+aiming = False
+
+
+def held_aiming() -> bool:
+    try:
+        return int(get_pc().Pawn.Weapon.ZoomState) != 0
+    except Exception:
+        return False
+
+
+def put_back_held() -> None:
+    """The gun type in your hands back where the game puts it."""
+    try:
+        path = get_pc().Pawn.Weapon.DefinitionData.WeaponTypeDefinition._path_name()
+    except Exception:
+        return
+    if group_by_type.get(path) is not None:
+        place(path, (None, 0, 0, 0))
+
+
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
 def on_render(
     obj: UObject,
@@ -194,7 +219,23 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Now and then, puts the gun in your hands where the settings say."""
-    global checked_at
+    global checked_at, aiming
+
+    # Aiming is looked at every frame, so the sights line up as soon as you aim.
+    now_aiming = held_aiming()
+    if now_aiming != aiming:
+        aiming = now_aiming
+        try:
+            if aiming:
+                put_back_held()
+            else:
+                check_held()
+            refresh()
+        except Exception as ex:
+            logging.dev_warning(f"[{LABEL}] could not switch for aiming ({ex})")
+        return
+    if aiming:
+        return
 
     now = time.monotonic()
     if now - checked_at < CHECK_SECONDS:

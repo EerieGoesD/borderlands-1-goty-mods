@@ -135,7 +135,7 @@ def put_back_all() -> None:
         place(path, (None, 0, 0, 0))
 
 
-def refresh() -> None:
+def refresh(with_fov: bool = True) -> None:
     """Moves the gun in your hands to where its type now says."""
     pc = get_pc()
     if pc is None or pc.Pawn is None:
@@ -143,10 +143,11 @@ def refresh() -> None:
     pawn = pc.Pawn
     # The gun FOV goes straight onto the screen's gun view, the same way other FOV mods
     # do it, so nothing else about the camera is worked out again.
-    try:
-        pc.ForegroundFOV = float(pawn.Weapon.DefinitionData.WeaponTypeDefinition.FirstPersonMeshFOV)
-    except Exception as ex:
-        logging.dev_warning(f"[{LABEL}] could not update the gun FOV ({ex})")
+    if with_fov:
+        try:
+            pc.ForegroundFOV = float(pawn.Weapon.DefinitionData.WeaponTypeDefinition.FirstPersonMeshFOV)
+        except Exception as ex:
+            logging.dev_warning(f"[{LABEL}] could not update the gun FOV ({ex})")
     try:
         pawn.SetArmPosition()
     except Exception as ex:
@@ -189,26 +190,43 @@ def check_held() -> bool:
     return off
 
 
-# Whether the gun in your hands is aimed down its sights. While it is, the gun sits
-# where the game puts it, since the sights only line up there.
-aiming = False
+# How far the gun in your hands is aimed down its sights, from 0 to 1, following the
+# game's own aiming animation. The sights only line up where the game puts the gun, so
+# the gun moves from your settings to there by the same amount, with no jump.
+aim = 0.0
 
 
-def held_aiming() -> bool:
+def held_aim() -> float:
     try:
-        return int(get_pc().Pawn.Weapon.ZoomState) != 0
+        weapon = get_pc().Pawn.Weapon
+        if int(weapon.ZoomState) == 0:
+            return 0.0
+        return max(0.0, min(1.0, float(weapon.GetZoomEffect())))
+    except Exception:
+        return 0.0
+
+
+def blend_held(amount: float) -> bool:
+    """The gun type in your hands part of the way from your settings to the game's own
+    spot. Returns whether its gun FOV is one the settings change."""
+    try:
+        gun_type = get_pc().Pawn.Weapon.DefinitionData.WeaponTypeDefinition
+        path = gun_type._path_name()
     except Exception:
         return False
-
-
-def put_back_held() -> None:
-    """The gun type in your hands back where the game puts it."""
-    try:
-        path = get_pc().Pawn.Weapon.DefinitionData.WeaponTypeDefinition._path_name()
-    except Exception:
-        return
-    if group_by_type.get(path) is not None:
-        place(path, (None, 0, 0, 0))
+    group = group_by_type.get(path)
+    if group is None:
+        return False
+    fov, forward, right, up = groups[group].wanted()
+    if fov is None:
+        changes_fov = False
+    else:
+        changes_fov = True
+        own = fov_before.get(path, float(gun_type.FirstPersonMeshFOV))
+        fov = None if amount >= 1.0 else fov + (own - fov) * amount
+    keep = 1.0 - amount
+    place(path, (fov, forward * keep, right * keep, up * keep))
+    return changes_fov
 
 
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
@@ -219,22 +237,18 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Now and then, puts the gun in your hands where the settings say."""
-    global checked_at, aiming
+    global checked_at, aim
 
-    # Aiming is looked at every frame, so the sights line up as soon as you aim.
-    now_aiming = held_aiming()
-    if now_aiming != aiming:
-        aiming = now_aiming
+    # Aiming is followed every frame, so the gun moves along with the game's animation.
+    now_aim = held_aim()
+    if abs(now_aim - aim) > 0.001:
+        aim = now_aim
         try:
-            if aiming:
-                put_back_held()
-            else:
-                check_held()
-            refresh()
+            refresh(blend_held(aim))
         except Exception as ex:
-            logging.dev_warning(f"[{LABEL}] could not switch for aiming ({ex})")
+            logging.dev_warning(f"[{LABEL}] could not follow the aiming ({ex})")
         return
-    if aiming:
+    if aim > 0.0:
         return
 
     now = time.monotonic()

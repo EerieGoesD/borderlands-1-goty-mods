@@ -35,6 +35,7 @@ Tested on both GOTY and GOTY Enhanced.
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
 | [Reset Chests](ResetChests) | Shuts every red, white and Knoxx chest you have opened in this area |
 | [Reset Enemies](ResetEnemies) | Brings the enemies in the area back without reloading your save |
+| [Reset Shop](ResetShop) | Fills the shops you are standing at with new items at the press of a key |
 | [Run And Walk](RunAndWalk) | Makes running and walking work off a hold key and a toggle key |
 | [Sell Value](SellValue) | Shows what an item sells for on its card |
 | [Teleport](Teleport) | Takes you to any place you have already been to in this playthrough |

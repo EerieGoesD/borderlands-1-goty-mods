@@ -69,6 +69,13 @@ def on_render(
     if pc is None or pc.Pawn is None:
         return
 
+    # Nothing draws while the menu with the map and skills or the pause screen is up.
+    try:
+        if pc.bStatusMenuOpen is True or pc.WorldInfo.Pauser is not None:
+            return
+    except Exception:
+        pass
+
     canvas = __args.Canvas
     if canvas is None:
         return

@@ -206,9 +206,54 @@ def held_aim() -> float:
         return 0.0
 
 
-def blend_held(amount: float) -> bool:
+# Where the gun sits while you sprint, on top of its own group's place, for every gun.
+SprintForward = SliderOption("Forward and Back", 0, -100, 100, 1, True)
+SprintRight = SliderOption("Left and Right", 0, -100, 100, 1, True)
+SprintUp = SliderOption("Up and Down", 0, -100, 100, 1, True)
+SprintGroup = NestedOption("Sprinting", [SprintForward, SprintRight, SprintUp])
+
+# How long the gun takes to move to its sprinting place and back, in seconds.
+SPRINT_SECONDS = 0.2
+
+# Whether you are sprinting, set by the game's own start and end of a sprint, and how
+# far the gun has moved to its sprinting place, from 0 to 1.
+sprinting = False
+sprint = 0.0
+frame_at = time.monotonic()
+
+
+def sprint_moves() -> bool:
+    return any(slider.value != 0 for slider in (SprintForward, SprintRight, SprintUp))
+
+
+@hook(hook_func="WillowGame.WillowPlayerController:BeginSprint", hook_type=Type.POST)
+def on_sprint_start(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    global sprinting
+    if obj == get_pc():
+        sprinting = True
+
+
+@hook(hook_func="WillowGame.WillowPlayerController:EndSprint", hook_type=Type.POST)
+def on_sprint_end(
+    obj: UObject,
+    __args: WrappedStruct,
+    __ret: any,
+    __func: BoundFunction,
+) -> None:
+    global sprinting
+    if obj == get_pc():
+        sprinting = False
+
+
+def blend_held(amount: float, sprint_amount: float) -> bool:
     """The gun type in your hands part of the way from your settings to the game's own
-    spot. Returns whether its gun FOV is one the settings change."""
+    spot, with the sprinting place added as far as the sprint has gone. Returns whether
+    its gun FOV is one the settings change."""
     try:
         gun_type = get_pc().Pawn.Weapon.DefinitionData.WeaponTypeDefinition
         path = gun_type._path_name()
@@ -224,6 +269,9 @@ def blend_held(amount: float) -> bool:
         changes_fov = True
         own = fov_before.get(path, float(gun_type.FirstPersonMeshFOV))
         fov = None if amount >= 1.0 else fov + (own - fov) * amount
+    forward += SprintForward.value * sprint_amount
+    right += SprintRight.value * sprint_amount
+    up += SprintUp.value * sprint_amount
     keep = 1.0 - amount
     place(path, (fov, forward * keep, right * keep, up * keep))
     return changes_fov
@@ -237,21 +285,28 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Now and then, puts the gun in your hands where the settings say."""
-    global checked_at, aim
+    global checked_at, aim, sprint, frame_at
+
+    # The sprinting place is moved into a little each frame, so the gun glides there.
+    now = time.monotonic()
+    step = min(1.0, (now - frame_at) / SPRINT_SECONDS)
+    frame_at = now
+    target = 1.0 if sprinting and sprint_moves() else 0.0
+    now_sprint = min(target, sprint + step) if target > sprint else max(target, sprint - step)
 
     # Aiming is followed every frame, so the gun moves along with the game's animation.
     now_aim = held_aim()
-    if abs(now_aim - aim) > 0.001:
+    if abs(now_aim - aim) > 0.001 or now_sprint != sprint:
         aim = now_aim
+        sprint = now_sprint
         try:
-            refresh(blend_held(aim))
+            refresh(blend_held(aim, sprint))
         except Exception as ex:
             logging.dev_warning(f"[{LABEL}] could not follow the aiming ({ex})")
         return
-    if aim > 0.0:
+    if aim > 0.0 or sprint > 0.0:
         return
 
-    now = time.monotonic()
     if now - checked_at < CHECK_SECONDS:
         return
     checked_at = now
@@ -268,6 +323,8 @@ def reset_all(option: ButtonOption) -> None:
     for group in groups.values():
         for slider in (group.fov, group.forward, group.right, group.up):
             slider.value = slider.default_value
+    for slider in (SprintForward, SprintRight, SprintUp):
+        slider.value = slider.default_value
     mod.save_settings()
 
 
@@ -293,9 +350,9 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 mod = build_mod(
-    options=[ResetAll] + [group.option for group in groups.values()],
+    options=[ResetAll] + [group.option for group in groups.values()] + [SprintGroup],
     keybinds=[],
-    hooks=[on_render],
+    hooks=[on_render, on_sprint_start, on_sprint_end],
     commands=[],
     on_enable=on_enable,
     on_disable=on_disable,

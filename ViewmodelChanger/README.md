@@ -9,6 +9,9 @@ In the mod's settings, each gun type has:
 - Left and Right
 - Up and Down
 
+Sprinting has its own Forward and Back, Left and Right, and Up and Down, for every gun
+while you sprint.
+
 ## Install
 
 Copy the mod's folder into `Borderlands\sdk_mods`, then start the game. It appears in

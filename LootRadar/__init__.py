@@ -96,7 +96,9 @@ shop_open = False
 shop_asked = 0.0
 
 marks: list[tuple[tuple[float, float, float], bool]] = []
-hidden: set[UObject] = set()
+# The pickups hidden, by name. Only names are kept between frames: the game frees a
+# pickup the moment somebody takes it, and touching a freed one takes the game down.
+hidden: set[str] = set()
 
 gear = None
 black = None
@@ -379,8 +381,9 @@ def label(canvas, x: float, y: float, text: str, colour) -> None:
 
 def forget(pickup: UObject) -> None:
     """Drops a pickup from everything held between frames."""
-    hidden.discard(pickup)
-    kinds.pop(pickup, None)
+    name = str(pickup)
+    hidden.discard(name)
+    kinds.pop(name, None)
 
 
 def alive(pickup: UObject) -> bool:
@@ -396,12 +399,17 @@ def alive(pickup: UObject) -> bool:
 
 
 def restore_all() -> None:
-    """Puts every hidden pickup back on screen."""
+    """Puts every hidden pickup back on screen, looking each one up fresh."""
     pc = get_pc()
     hud = None if pc is None else pc.myHUD
 
-    for pickup in list(hidden):
-        hidden.discard(pickup)
+    for pickup in unrealsdk.find_all("WillowPickup"):
+        if not hidden:
+            break
+        name = str(pickup)
+        if name not in hidden:
+            continue
+        hidden.discard(name)
         if not alive(pickup):
             continue
         try:
@@ -410,6 +418,7 @@ def restore_all() -> None:
             pickup.SpawnPickupParticles()
         except Exception:
             pass
+    hidden.clear()
 
 
 def on_disable() -> None:
@@ -449,10 +458,10 @@ def on_spawn_particles(
 
     full = HideFull.value is True and not can_take(obj, pc.Pawn)
     if not full and worth_taking(obj):
-        hidden.discard(obj)
+        hidden.discard(str(obj))
         return None
 
-    hidden.add(obj)
+    hidden.add(str(obj))
 
     # Take it off the screen straight away rather than waiting for the next sweep.
     try:
@@ -473,7 +482,7 @@ chest_frames = CHESTS_EVERY
 waiting_marks: list = []
 
 # What each pickup turned out to be, so its name is only read once.
-kinds: dict[UObject, str] = {}
+kinds: dict[str, str] = {}
 
 # How long to sit out, in seconds, while a new area is being swapped in.
 SETTLE_SECONDS = 5.0
@@ -610,9 +619,10 @@ def sweep() -> None:
 def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
     """Looks at a few pickups, hiding what you cannot carry and marking the rest."""
     for pickup in batch:
+        name = str(pickup)
         try:
             if pickup.bDeleteMe is True or pickup.bPendingDelete is True:
-                hidden.discard(pickup)
+                hidden.discard(name)
                 continue
             if pickup.Inventory is None:
                 continue
@@ -633,9 +643,9 @@ def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
         if hiding:
             if show:
                 missing = (
-                    pickup in hidden if on_screen is None else pickup not in on_screen
+                    name in hidden if on_screen is None else pickup not in on_screen
                 )
-                hidden.discard(pickup)
+                hidden.discard(name)
                 if missing:
                     try:
                         if hud is not None:
@@ -643,8 +653,8 @@ def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
                         pickup.SpawnPickupParticles()
                     except Exception:
                         pass
-            elif pickup not in hidden:
-                hidden.add(pickup)
+            elif name not in hidden:
+                hidden.add(name)
                 try:
                     if hud is not None:
                         hud.RemovePostRenderedActor(pickup)
@@ -656,10 +666,10 @@ def step_through(pawn, hud, on_screen, hiding, batch: list) -> None:
         if not takeable or not better:
             continue
 
-        kind = kinds.get(pickup)
+        kind = kinds.get(name)
         if kind is None:
             kind = kind_of(pickup)
-            kinds[pickup] = kind
+            kinds[name] = kind
 
         if wanted(kind):
             try:

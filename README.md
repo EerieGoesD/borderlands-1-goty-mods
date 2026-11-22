@@ -30,7 +30,6 @@ Tested on both GOTY and GOTY Enhanced.
 | [No Weapon Flash (Epilepsy Friendly)](NoWeaponFlash) | Removes the flashes and sparks from gunfire |
 | [One Shot One Kill](OneShotOneKill) | Every enemy and enemy vehicle you hit dies from that hit |
 | [Open All Chests](OpenAllChests) | Opens every red, white and Knoxx chest and strong box in the area with one button |
-| [Objective Distance](ObjectiveDistance) | Distance to your objective and a line on the ground to it |
 | [Random Vehicle Colour](RandomVehicleColour) | Gives every vehicle you spawn a random paint job |
 | [Repeat Mission](RepeatMission) | Repeat a mission you have finished, or set it ready to turn in |
 | [Reset Chests](ResetChests) | Shuts every red, white and Knoxx chest you have opened in this area |

@@ -14,7 +14,9 @@ RECHECK_FRAMES = 60
 # Temporary: logs what happens while you look at a pickup.
 DEBUG = False
 
-hidden: set[UObject] = set()
+# The pickups hidden, by name. Only names are kept: the game frees a pickup the moment
+# somebody takes it, and touching a freed one takes the game down.
+hidden: set[str] = set()
 frames = 0
 
 
@@ -55,8 +57,21 @@ def dump_pickup(pickup: UObject) -> None:
         logging.info(f"[Hide Full Pickups] {key} no components ({ex})")
 
 
+def says_full(pickup: UObject) -> bool:
+    """Whether this is ammo, health or money: the only pickups the game marks FULL.
+    Gear you cannot use yet, such as a gun above your level, keeps its beam."""
+    try:
+        tag = str(pickup.Inventory.DefinitionData.ItemDefinition).lower()
+    except Exception:
+        return False
+    return any(word in tag for word in ("ammodrop", "ammo", "health", "medkit", "currency", "credit", "money", "cash"))
+
+
 def can_use(pickup: UObject) -> bool:
     """Whether the player could actually pick this up right now."""
+    if not says_full(pickup):
+        return True
+
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return True
@@ -74,14 +89,15 @@ def on_spawn_particles(
     __ret: any,
     __func: BoundFunction,
 ) -> type[Block] | None:
+    name = str(obj)
     if can_use(obj):
-        hidden.discard(obj)
+        hidden.discard(name)
         return None
 
     if DEBUG:
         dump_pickup(obj)
 
-    hidden.add(obj)
+    hidden.add(name)
 
     # Take it off the screen straight away rather than waiting for the next sweep.
     try:
@@ -107,12 +123,17 @@ def alive(pickup: UObject) -> bool:
 
 
 def restore_all() -> None:
-    """Puts every hidden pickup back on screen."""
+    """Puts every hidden pickup back on screen, looking each one up fresh."""
     pc = get_pc()
     hud = None if pc is None else pc.myHUD
 
-    for pickup in list(hidden):
-        hidden.discard(pickup)
+    for pickup in unrealsdk.find_all("WillowPickup"):
+        if not hidden:
+            break
+        name = str(pickup)
+        if name not in hidden:
+            continue
+        hidden.discard(name)
         if not alive(pickup):
             continue
         try:
@@ -121,6 +142,7 @@ def restore_all() -> None:
             pickup.SpawnPickupParticles()
         except Exception:
             pass
+    hidden.clear()
 
 
 def on_disable() -> None:
@@ -148,8 +170,9 @@ def on_render(
     # Everything is looked at here and now. Holding on to a pickup between frames
     # takes the game down, since the game frees it the moment somebody takes it.
     for pickup in unrealsdk.find_all("WillowPickup"):
+        name = str(pickup)
         if not alive(pickup):
-            hidden.discard(pickup)
+            hidden.discard(name)
             continue
 
         try:
@@ -160,16 +183,16 @@ def on_render(
         hud = pc.myHUD
 
         if usable:
-            if pickup in hidden:
-                hidden.discard(pickup)
+            if name in hidden:
+                hidden.discard(name)
                 try:
                     if hud is not None:
                         hud.AddPostRenderedActor(pickup)
                     pickup.SpawnPickupParticles()
                 except Exception:
                     pass
-        elif pickup not in hidden:
-            hidden.add(pickup)
+        elif name not in hidden:
+            hidden.add(name)
             try:
                 if hud is not None:
                     hud.RemovePostRenderedActor(pickup)

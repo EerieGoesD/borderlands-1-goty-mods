@@ -39,6 +39,13 @@ ShowSpeed = BoolOption("Show movement speed [DEBUG]", False, "Yes", "No")
 font = None
 white = None
 
+# A skill that speeds you up, such as Phasewalk, puts a boost on the game's own list,
+# and the game works out your speed from the base and that list. The boost it gave is
+# read the moment the list changes, as a share of the base, and kept on top of the
+# slider. The list is remembered as text only.
+boost = 1.0
+boost_for = "[]"
+
 
 def driving(pawn: UObject) -> bool:
     """Whether what you are moving is a car rather than yourself."""
@@ -56,6 +63,8 @@ def on_render(
     __func: BoundFunction,
 ) -> None:
     """Holds your speed at whatever the sliders say, whichever way you are moving."""
+    global boost, boost_for
+
     pc = get_pc()
     if pc is None or pc.Pawn is None:
         return
@@ -86,13 +95,19 @@ def on_render(
             else:
                 wanted = float(WalkSpeed.value)
 
+            boosts = str(pc.Pawn.GroundSpeedModifierStack)
+            if boosts != boost_for:
+                boost_for = boosts
+                base = float(pc.Pawn.GroundSpeedBaseValue)
+                boost = float(pc.Pawn.GroundSpeed) / base if boosts != "[]" and base > 0 else 1.0
+
             # The game, and the Run And Walk mod, both fall back on the base number,
             # so it is held at the same place as the one in use.
             if abs(float(pc.Pawn.GroundSpeedBaseValue) - wanted) > 0.5:
                 pc.Pawn.GroundSpeedBaseValue = wanted
 
-            if abs(float(pc.Pawn.GroundSpeed) - wanted) > 0.5:
-                pc.Pawn.GroundSpeed = wanted
+            if abs(float(pc.Pawn.GroundSpeed) - wanted * boost) > 0.5:
+                pc.Pawn.GroundSpeed = wanted * boost
         except Exception as ex:
             logging.dev_warning(f"[Movement Speed Changer] could not set the speed ({ex})")
 

@@ -1,6 +1,6 @@
 [project]
 name = "MovementSpeedChanger"
-version = "1.0.0"
+version = "1.0.1"
 authors = [{ name = "eeriegoesd" }]
 description = """Sets how fast you walk, run, aim, crouch and drive.
 

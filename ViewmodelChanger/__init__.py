@@ -7,7 +7,7 @@ from unrealsdk.hooks import Type  # type: ignore
 from unrealsdk.unreal import BoundFunction, UObject, WrappedStruct  # type: ignore
 
 from mods_base import SETTINGS_DIR, build_mod, get_pc, hook
-from mods_base.options import ButtonOption, NestedOption, SliderOption
+from mods_base.options import BoolOption, ButtonOption, NestedOption, SliderOption
 
 LABEL = "Viewmodel Changer"
 
@@ -23,10 +23,9 @@ GROUP_FOV = {
     "Eridian Weapons": 55,
 }
 
-# How often the gun in your hands is checked, in seconds, in case the game put its
-# type back to normal, such as after loading an area.
-CHECK_SECONDS = 0.5
-checked_at = 0.0
+# How long the gun takes to move into and out of its sprinting, melee and grenade
+# places, in seconds. Kept short so the move is not seen as the gun growing or shrinking.
+BLEND_SECONDS = 0.1
 
 # These three are kept when the mod is reloaded from the console: the copy being
 # replaced puts every gun back from them, and it only does so after this file has run.
@@ -62,42 +61,62 @@ def group_of(gun_type: UObject) -> str | None:
     return None
 
 
+def slider(name: str) -> SliderOption:
+    return SliderOption(name, 0, -100, 100, 1, True)
+
+
 class Group:
-    """The four settings for one group of guns."""
+    """The settings for one group of guns."""
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.fov = SliderOption("Gun FOV", GROUP_FOV[name], 10, 100, 1, True, on_change_anytime=self.changed)
-        self.forward = SliderOption("Forward and Back", 0, -100, 100, 1, True, on_change_anytime=self.changed)
-        self.right = SliderOption("Left and Right", 0, -100, 100, 1, True, on_change_anytime=self.changed)
-        self.up = SliderOption("Up and Down", 0, -100, 100, 1, True, on_change_anytime=self.changed)
-        self.option = NestedOption(name, [self.fov, self.forward, self.right, self.up])
+        self.fov = SliderOption("Gun FOV", GROUP_FOV[name], 10, 100, 1, True)
+        self.forward = slider("Forward and Back")
+        self.right = slider("Left and Right")
+        self.up = slider("Up and Down")
 
-    def wanted(self) -> tuple[float | None, float, float, float]:
-        """The gun FOV, None to leave it alone, then the three moves."""
-        fov = None if self.fov.value == self.fov.default_value else self.fov.value
-        return (fov, self.forward.value, self.right.value, self.up.value)
+        # Where the gun sits while you sprint. Off, it stays where it is.
+        self.sprint_on = BoolOption("Sprint Position", False, "On", "Off")
+        self.sprint_forward = slider("Forward and Back")
+        self.sprint_right = slider("Left and Right")
+        self.sprint_up = slider("Up and Down")
 
-    def changed(self, option: SliderOption, value: float) -> None:
-        # Called before the setting takes the new value, so it is put in by hand.
-        fov, forward, right, up = self.wanted()
-        if option is self.fov:
-            fov = None if value == self.fov.default_value else value
-        elif option is self.forward:
-            forward = value
-        elif option is self.right:
-            right = value
-        elif option is self.up:
-            up = value
-        if not enabled:
-            return
-        for path, group in group_by_type.items():
-            if group == self.name:
-                place(path, (fov, forward, right, up))
-        refresh()
+        # Where the gun sits while aiming down its sights, from the game's own spot.
+        self.aim_forward = slider("Forward and Back")
+        self.aim_up = slider("Up and Down")
+
+        self.option = NestedOption(
+            name,
+            [
+                self.fov,
+                self.forward,
+                self.right,
+                self.up,
+                NestedOption(
+                    "Sprinting",
+                    [self.sprint_on, self.sprint_forward, self.sprint_right, self.sprint_up],
+                ),
+                NestedOption("Aiming", [self.aim_forward, self.aim_up]),
+            ],
+        )
+
+    def values(self) -> list:
+        return [
+            self.fov, self.forward, self.right, self.up, self.sprint_on, self.sprint_forward,
+            self.sprint_right, self.sprint_up, self.aim_forward, self.aim_up,
+        ]
 
 
 groups = {name: Group(name) for name in GROUP_FOV}
+
+# Where the gun sits during a melee and a grenade throw, on top of where it was, for
+# every gun.
+MeleeForward = slider("Forward and Back")
+MeleeUp = slider("Up and Down")
+GrenadeForward = slider("Forward and Back")
+GrenadeUp = slider("Up and Down")
+MeleeGroup = NestedOption("Melee", [MeleeForward, MeleeUp])
+GrenadeGroup = NestedOption("Grenade Throw", [GrenadeForward, GrenadeUp])
 
 enabled = False
 
@@ -154,51 +173,10 @@ def refresh(with_fov: bool = True) -> None:
         logging.dev_warning(f"[{LABEL}] could not move the gun ({ex})")
 
 
-def check_held() -> bool:
-    """Puts the gun type in your hands where the settings say, if it is not there.
-
-    Returns whether anything had to change.
-    """
-    pc = get_pc()
-    if pc is None or pc.Pawn is None:
-        return False
+def held_aim(weapon: UObject) -> float:
+    """How far the gun is aimed down its sights, from 0 to 1, following the game's own
+    aiming animation."""
     try:
-        gun_type = pc.Pawn.Weapon.DefinitionData.WeaponTypeDefinition
-        path = gun_type._path_name()
-    except Exception:
-        return False
-
-    if path not in group_by_type:
-        group_by_type[path] = group_of(gun_type)
-        offset = gun_type.PlayerViewOffset
-        start[path] = (float(offset.X), float(offset.Y), float(offset.Z))
-    group = group_by_type[path]
-    if group is None:
-        return False
-
-    fov, forward, right, up = groups[group].wanted()
-    x, y, z = start[path]
-    offset = gun_type.PlayerViewOffset
-    off = (
-        abs(float(offset.X) - (x + forward)) > 0.01
-        or abs(float(offset.Y) - (y + right)) > 0.01
-        or abs(float(offset.Z) - (z + up)) > 0.01
-        or (fov is not None and abs(float(gun_type.FirstPersonMeshFOV) - fov) > 0.01)
-    )
-    if off:
-        place(path, (fov, forward, right, up))
-    return off
-
-
-# How far the gun in your hands is aimed down its sights, from 0 to 1, following the
-# game's own aiming animation. The sights only line up where the game puts the gun, so
-# the gun moves from your settings to there by the same amount, with no jump.
-aim = 0.0
-
-
-def held_aim() -> float:
-    try:
-        weapon = get_pc().Pawn.Weapon
         if int(weapon.ZoomState) == 0:
             return 0.0
         return max(0.0, min(1.0, float(weapon.GetZoomEffect())))
@@ -206,75 +184,19 @@ def held_aim() -> float:
         return 0.0
 
 
-# Where the gun sits while you sprint, on top of its own group's place, for every gun.
-SprintForward = SliderOption("Forward and Back", 0, -100, 100, 1, True)
-SprintRight = SliderOption("Left and Right", 0, -100, 100, 1, True)
-SprintUp = SliderOption("Up and Down", 0, -100, 100, 1, True)
-SprintGroup = NestedOption("Sprinting", [SprintForward, SprintRight, SprintUp])
-
-# How long the gun takes to move to its sprinting place and back, in seconds.
-SPRINT_SECONDS = 0.2
-
-# Whether you are sprinting, set by the game's own start and end of a sprint, and how
-# far the gun has moved to its sprinting place, from 0 to 1.
-sprinting = False
-sprint = 0.0
+# How far the gun has moved into its sprinting, melee and grenade places, from 0 to 1.
+moves = {"sprint": 0.0, "melee": 0.0, "grenade": 0.0}
 frame_at = time.monotonic()
 
-
-def sprint_moves() -> bool:
-    return any(slider.value != 0 for slider in (SprintForward, SprintRight, SprintUp))
-
-
-@hook(hook_func="WillowGame.WillowPlayerController:BeginSprint", hook_type=Type.POST)
-def on_sprint_start(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    global sprinting
-    if obj == get_pc():
-        sprinting = True
+# The gun type in your hands, by name, and when it came out. While a gun is being
+# switched to, it is not put in its sprinting place.
+held_path: str | None = None
+switched_at = 0.0
+switch_seconds = 0.0
 
 
-@hook(hook_func="WillowGame.WillowPlayerController:EndSprint", hook_type=Type.POST)
-def on_sprint_end(
-    obj: UObject,
-    __args: WrappedStruct,
-    __ret: any,
-    __func: BoundFunction,
-) -> None:
-    global sprinting
-    if obj == get_pc():
-        sprinting = False
-
-
-def blend_held(amount: float, sprint_amount: float) -> bool:
-    """The gun type in your hands part of the way from your settings to the game's own
-    spot, with the sprinting place added as far as the sprint has gone. Returns whether
-    its gun FOV is one the settings change."""
-    try:
-        gun_type = get_pc().Pawn.Weapon.DefinitionData.WeaponTypeDefinition
-        path = gun_type._path_name()
-    except Exception:
-        return False
-    group = group_by_type.get(path)
-    if group is None:
-        return False
-    fov, forward, right, up = groups[group].wanted()
-    if fov is None:
-        changes_fov = False
-    else:
-        changes_fov = True
-        own = fov_before.get(path, float(gun_type.FirstPersonMeshFOV))
-        fov = None if amount >= 1.0 else fov + (own - fov) * amount
-    forward += SprintForward.value * sprint_amount
-    right += SprintRight.value * sprint_amount
-    up += SprintUp.value * sprint_amount
-    keep = 1.0 - amount
-    place(path, (fov, forward * keep, right * keep, up * keep))
-    return changes_fov
+def towards(current: float, target: float, step: float) -> float:
+    return min(target, current + step) if target > current else max(target, current - step)
 
 
 @hook(hook_func="Engine.GameViewportClient:PostRender", hook_type=Type.POST)
@@ -284,47 +206,110 @@ def on_render(
     __ret: any,
     __func: BoundFunction,
 ) -> None:
-    """Now and then, puts the gun in your hands where the settings say."""
-    global checked_at, aim, sprint, frame_at
+    """Every frame, puts the gun in your hands where the settings say for what you are
+    doing: standing, sprinting, aiming, in a melee or throwing a grenade."""
+    global frame_at, held_path, switched_at, switch_seconds
 
-    # The sprinting place is moved into a little each frame, so the gun glides there.
     now = time.monotonic()
-    step = min(1.0, (now - frame_at) / SPRINT_SECONDS)
-    frame_at = now
-    target = 1.0 if sprinting and sprint_moves() else 0.0
-    now_sprint = min(target, sprint + step) if target > sprint else max(target, sprint - step)
-
-    # Aiming is followed every frame, so the gun moves along with the game's animation.
-    now_aim = held_aim()
-    if abs(now_aim - aim) > 0.001 or now_sprint != sprint:
-        aim = now_aim
-        sprint = now_sprint
-        try:
-            refresh(blend_held(aim, sprint))
-        except Exception as ex:
-            logging.dev_warning(f"[{LABEL}] could not follow the aiming ({ex})")
+    pc = get_pc()
+    if pc is None or pc.Pawn is None:
+        frame_at = now
         return
-    if aim > 0.0 or sprint > 0.0:
+    try:
+        pawn = pc.Pawn
+        weapon = pawn.Weapon
+        gun_type = weapon.DefinitionData.WeaponTypeDefinition
+        path = gun_type._path_name()
+    except Exception:
+        frame_at = now
         return
-
-    if now - checked_at < CHECK_SECONDS:
-        return
-    checked_at = now
 
     try:
-        if check_held():
-            refresh()
+        if path not in group_by_type:
+            group_by_type[path] = group_of(gun_type)
+            offset = gun_type.PlayerViewOffset
+            start[path] = (float(offset.X), float(offset.Y), float(offset.Z))
+        group = group_by_type[path]
+        if group is None:
+            frame_at = now
+            return
+        settings = groups[group]
+
+        # Nothing moves on while the game is paused.
+        paused = pc.WorldInfo.Pauser is not None
+        step = 0.0 if paused else min(1.0, (now - frame_at) / BLEND_SECONDS)
+        frame_at = now
+
+        if path != held_path:
+            held_path = path
+            switched_at = now
+            try:
+                switch_seconds = float(weapon.EquipTime)
+            except Exception:
+                switch_seconds = 1.0
+
+        meleeing = pc.bPerformingMeleeAttack is True
+        throwing = pc.bThrowingGrenade is True
+        # The game counts you as sprinting only on the ground. It also lets you reload,
+        # melee, throw or switch guns mid-sprint, so the sprinting place waits for those.
+        sprinting = (
+            settings.sprint_on.value is True
+            and int(pawn.bIsSprinting) != 0
+            and int(pawn.Physics) == 1
+            and int(pawn.bReloading) == 0
+            and not meleeing
+            and not throwing
+            and now - switched_at >= switch_seconds
+        )
+        moves["sprint"] = towards(moves["sprint"], 1.0 if sprinting else 0.0, step)
+        moves["melee"] = towards(moves["melee"], 1.0 if meleeing else 0.0, step)
+        moves["grenade"] = towards(moves["grenade"], 1.0 if throwing else 0.0, step)
+        aim = held_aim(weapon)
+
+        forward = float(settings.forward.value)
+        right = float(settings.right.value)
+        up = float(settings.up.value)
+        sprint = moves["sprint"]
+        forward += (float(settings.sprint_forward.value) - forward) * sprint
+        right += (float(settings.sprint_right.value) - right) * sprint
+        up += (float(settings.sprint_up.value) - up) * sprint
+        forward += float(MeleeForward.value) * moves["melee"] + float(GrenadeForward.value) * moves["grenade"]
+        up += float(MeleeUp.value) * moves["melee"] + float(GrenadeUp.value) * moves["grenade"]
+        # The sights only line up at the game's own spot, so aiming moves the gun from
+        # your settings to there, plus the aiming settings, as the animation goes.
+        forward = forward * (1.0 - aim) + float(settings.aim_forward.value) * aim
+        right = right * (1.0 - aim)
+        up = up * (1.0 - aim) + float(settings.aim_up.value) * aim
+
+        fov = None if settings.fov.value == settings.fov.default_value else float(settings.fov.value)
+        changes_fov = fov is not None
+        if fov is not None:
+            own = fov_before.get(path, float(gun_type.FirstPersonMeshFOV))
+            fov = None if aim >= 1.0 else fov + (own - fov) * aim
+
+        x, y, z = start[path]
+        offset = gun_type.PlayerViewOffset
+        off = (
+            abs(float(offset.X) - (x + forward)) > 0.01
+            or abs(float(offset.Y) - (y + right)) > 0.01
+            or abs(float(offset.Z) - (z + up)) > 0.01
+            or (fov is not None and abs(float(gun_type.FirstPersonMeshFOV) - fov) > 0.01)
+            or (fov is None and path in fov_before)
+        )
+        if off:
+            place(path, (fov, forward, right, up))
+            refresh(changes_fov)
     except Exception as ex:
-        logging.dev_warning(f"[{LABEL}] could not check the gun ({ex})")
+        logging.dev_warning(f"[{LABEL}] could not place the gun ({ex})")
 
 
 def reset_all(option: ButtonOption) -> None:
     """Every setting back to the game's own, for every gun type."""
     for group in groups.values():
-        for slider in (group.fov, group.forward, group.right, group.up):
-            slider.value = slider.default_value
-    for slider in (SprintForward, SprintRight, SprintUp):
-        slider.value = slider.default_value
+        for setting in group.values():
+            setting.value = setting.default_value
+    for setting in (MeleeForward, MeleeUp, GrenadeForward, GrenadeUp):
+        setting.value = setting.default_value
     mod.save_settings()
 
 
@@ -334,8 +319,6 @@ ResetAll = ButtonOption("Reset to Default", on_press=reset_all)
 def on_enable() -> None:
     global enabled
     enabled = True
-    if check_held():
-        refresh()
 
 
 def on_disable() -> None:
@@ -350,9 +333,9 @@ __version__: str
 __version_info__: tuple[int, ...]
 
 mod = build_mod(
-    options=[ResetAll] + [group.option for group in groups.values()] + [SprintGroup],
+    options=[ResetAll] + [group.option for group in groups.values()] + [MeleeGroup, GrenadeGroup],
     keybinds=[],
-    hooks=[on_render, on_sprint_start, on_sprint_end],
+    hooks=[on_render],
     commands=[],
     on_enable=on_enable,
     on_disable=on_disable,

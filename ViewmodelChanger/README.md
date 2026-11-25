@@ -8,9 +8,10 @@ In the mod's settings, each gun type has:
 - Forward and Back
 - Left and Right
 - Up and Down
+- Sprinting: Sprint Position, then Forward and Back, Left and Right, Up and Down
+- Aiming: Forward and Back, Up and Down
 
-Sprinting has its own Forward and Back, Left and Right, and Up and Down, for every gun
-while you sprint.
+Melee and Grenade Throw each have Forward and Back, and Up and Down, for every gun.
 
 ## Install
 
